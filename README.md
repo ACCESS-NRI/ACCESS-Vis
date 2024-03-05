@@ -1,2 +1,6 @@
 # Visualisations
 Visualisation examples and resources, including open-source 3D vis for ACCESS-NRI releases
+
+This repository is intended as a resource for complex visualisation tasks using ACCESS models and other related data sources.
+
+What this space for published source code for our released visualisations which will be added here as soon as tested and ready for public release.
