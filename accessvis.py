@@ -2,6 +2,9 @@
 # #!pip install py360convert
 import numpy as np
 import py360convert
+from PIL import Image
+import os
+Image.MAX_IMAGE_PIXELS = 1061683200
 
 def latlon_to_3D(lat, lon, alt=0):
     """
@@ -40,6 +43,10 @@ def latlon_to_3D_true(lat, lon, alt=0, flattening=1.0/298.257223563):
     #return (x, y, z)
 
 def split_tex(data, res, flip=[]):
+    """
+    Convert a texture image from equirectangular to a set of 6 cubemap faces
+    (requires py360convert)
+    """
     if len(data.shape) == 2:
         data = data.reshape(data.shape[0],data.shape[1],1)
     channels = data.shape[2]
@@ -55,7 +62,9 @@ def split_tex(data, res, flip=[]):
     return tiles
 
 def draw_latlon_grid(base_img, out_fn, lat=30, lon=30, linewidth=5, colour=0):
-    #Create lat/lon grid image over provided base image
+    """
+    Create lat/lon grid image over provided base image
+    """
     from PIL import Image
     
     #Open base image
@@ -84,4 +93,68 @@ def draw_latlon_grid(base_img, out_fn, lat=30, lon=30, linewidth=5, colour=0):
         
     display(image)
     image.save(out_fn)
+
+def latlon_to_uv(lat, lon):
+    """
+    Convert a decimal longitude, latitude coordinate
+    to a tex coord in an equirectangular image
+    """
+    #X/u E-W Longitude - [-180,180]
+    u = 0.5 + lon/360.0
+
+    #Y/v N-S Latitude  - [-90,90]
+    v = 0.5 - lat/180.0
+
+    return u,v
+
+def uv_to_pixel(u, v, width, height):
+    """
+    Convert tex coord [0,1]
+    to a raster image pixel coordinate for given width/height
+    """
+    return int(u * width), int(v * height)
+
+def latlon_to_pixel(lat, lon, width, height):
+    """
+    Convert a decimal latitude/longitude coordinate
+    to a raster image pixel coordinate for given width/height
+    """
+    u, v = latlon_to_uv(lat, lon)
+    return uv_to_pixel(u, v, width, height)
+
+def crop_img_uv(img, top_left, bottom_right):
+    """
+    Crop an image (PIL or numpy array) based on corner coords
+    Provide coords as texture coords in [0,1]
+    """
+    u0 = top_left[0]
+    u1 = bottom_right[0]
+    v0 = top_left[1]
+    v1 = bottom_right[1]
+    #Swap coords if order incorrect
+    if u0 > u1:
+        u0, u1 = u1, u0
+    if v0 > v1:
+        v0, v1 = v1, v0
+    #Supports numpy array or PIL image
+    if isinstance(img, np.ndarray):
+        #Assumes [lat][lon]
+        lat = int(v0*img.shape[0]), int(v1*img.shape[0])
+        lon = int(u0*img.shape[1]), int(u1*img.shape[1])
+        print(lat, lon)
+        return img[lat[0] : lat[1], lon[0] : lon[1]]
+    elif hasattr(img, 'crop'):
+        area = (int(u0*img.size[0]), int(v0*img.size[1]), int(u1*img.size[0]), int(v1*img.size[1]))
+        return img.crop(area)
+    else:
+        print("Unknown type: ", type(img))
+
+def crop_img_lat_lon(img, top_left, bottom_right):
+    """
+    Crop an equirectangular image (PIL or numpy array) based on corner coords
+    Provide coords as lat/lon coords in decimal degrees
+    """
+    a = latlon_to_uv(*top_left)
+    b = latlon_to_uv(*bottom_right)
+    return crop_img_uv(img, a, b)
 
