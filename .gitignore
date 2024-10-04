@@ -1,9 +1,9 @@
 .ipynb_checkpoints
-Earth/4_no_ice_clouds_*.jpg
-Earth/*.npz
-Earth/*_bath*.png
-Earth/*_topo*.png
-Earth/*_high.png
-Earth/*_low.png
-Earth/*_flat.png
-Earth/gebco_*.png
+outputs
+wip_notebooks
+notes
+build
+__pycache__
+vid_old
+src/accessvis/data
+src/accessvis.egg-info
