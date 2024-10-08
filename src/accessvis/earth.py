@@ -38,7 +38,11 @@ class Settings():
         HEADLESS = True
     else:
         DATA_PATH = INSTALL_PATH / 'data'
-        HEADLESS = True # False
+        try:
+            import moderngl
+            HEADLESS = True
+        except (ImportError) as e:
+            HEADLESS = False
     GEBCO_PATH = DATA_PATH / 'GEBCO_2020.nc'
 
     def __repr__(self):
