@@ -855,6 +855,8 @@ def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None,
             #Replace hour or minute?
             if hour is not None:
                 time = time.replace(hour=hour)
+                #If only hour provided, always zero the minute
+                if minute is None: minute = 0
             if minute is not None:
                 time = time.replace(minute=minute)
 
