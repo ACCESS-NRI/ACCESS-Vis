@@ -31,13 +31,26 @@ class Settings():
     TEXRES = 2048
     GRIDRES = 1024
     MAXGRIDRES = 4096
-    #Where data is stored, defaults to module dir
-    BASEDIR = Path(__file__).parents[0]
+    #Where data is stored, defaults to module dir unless on gadi
+    INSTALL_PATH = Path(__file__).parents[0]
+    if 'gadi.nci.org.au' in os.getenv('HOSTNAME'):
+        DATA_PATH = Path('/g/data/nf33/public/data/accessvis')
+        HEADLESS = True
+    else:
+        DATA_PATH = INSTALL_PATH / 'data'
+        HEADLESS = True # False
+    GEBCO_PATH = DATA_PATH / 'GEBCO_2020.nc'
 
     def __repr__(self):
-        return f'resolution {self.RES}, {self.FULL_RES_Y}, texture {self.TEXRES}, grid {self.GRIDRES}, maxgrid {self.MAXGRIDRES} basedir {self.BASEDIR}'
+        return f'resolution {self.RES}, {self.FULL_RES_Y}, texture {self.TEXRES}, grid {self.GRIDRES}, maxgrid {self.MAXGRIDRES} basedir {self.DATA_PATH}'
 
 settings = Settings()
+
+def get_viewer(*args, **kwargs):
+    if settings.HEADLESS:
+        return lavavu.Viewer(*args, context="moderngl", **kwargs)
+    else:
+        return lavavu.Viewer(*args, **kwargs)
 
 def set_resolution(val):
     settings.RES = val
@@ -281,7 +294,7 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
     if cache and os.path.exists(fn + '.npz'):
         sdata = np.load(fn + '.npz')
     else:
-        lv = lavavu.Viewer()
+        lv = get_viewer()
         tris0 = lv.spheres("sphere", scaling=radius, segments=quality, colour="grey", vertices=[0,0,0], fliptexture=False)
         tris0['rotate'] = [0,-90,0] #This rotates the sphere coords to align with [0,360] longitude texture
         tris0['texture'] = 'blank.png' #Need an initial texture or texcoords will not be generated
@@ -328,10 +341,11 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
     #Generate cube face grid
     sdata = {}
     cdata = {}
-    fn = f'{settings.BASEDIR}/data/sphere/cube_sphere_{resolution}'
+    fn = f'{settings.DATA_PATH}/sphere/cube_sphere_{resolution}'
     if cache and os.path.exists(fn + '.npz'):
         cdata = np.load(fn + '.npz')
         cache = False #Don't need to write again
+    os.makedirs(settings.DATA_PATH / 'sphere', exist_ok=True)
 
     #For each cube face...
     for f in ['F', 'R', 'B', 'L', 'U', 'D']:
@@ -374,7 +388,7 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
         np.savez_compressed(fn, **cdata)
     return sdata
 
-def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration=1, bathymetry=True, gebco_file='GEBCO_2020.nc'):
+def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration=1, bathymetry=True):
     """
     Load topography from pre-saved data
     TODO: Support land/sea mask, document args
@@ -391,15 +405,15 @@ def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration
     """
     #Load detailed topo data
     if resolution is None: resolution = settings.GRIDRES
-    process_gebco(gebco_file) #Ensure data exists
-    fn = f'{settings.BASEDIR}/data/gebco/gebco_cubemap_{resolution}.npz'
+    process_gebco() #Ensure data exists
+    fn = f'{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz'
     if not os.path.exists(fn):
         raise(Exception("GEBCO data not found"))
     heights = np.load(fn)
     #Apply to cubemap sphere
     return cubemap_sphere_vertices(radius, resolution, heights, vertical_exaggeration)
 
-def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True, gebco_file='GEBCO_2020.nc'):
+def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True):
     """
     Load topography from pre-saved equirectangular data, can be cropped for regional plots
 
@@ -411,20 +425,20 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True,
     #Load medium-detail topo data
     if resolution > 21600:
         #Attempt to load full GEBCO
-        if not gebco_file or not os.path.exists(gebco_file):
+        if not settings.GEBCO_PATH or not os.path.exists(settings.GEBCO_PATH):
             resolution = 21600
-            print('Please pass path to GEBCO_2020.nc in arg `gebco_file`')
+            print('Please pass path to GEBCO_2020.nc in settings.GEBCO_PATH')
             print('https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/')
             print(f'Dropping resolution to {resolution} in order to continue...')
         else:
-            ds = xr.open_dataset(gebco_file)
+            ds = xr.open_dataset(settings.GEBCO_PATH)
             heights = ds['elevation'][::subsample, ::subsample].to_numpy()
             heights = np.flipud(heights)
 
     if heights is None:
-        process_gebco(gebco_file) #Ensure data exists
+        process_gebco() #Ensure data exists
         basefn = f'gebco_equirectangular_{resolution*2}_x_{resolution}.npz'
-        fn = f'{settings.BASEDIR}/data/gebco/{basefn}'
+        fn = f'{settings.DATA_PATH}/gebco/{basefn}'
         if not os.path.exists(fn):
             raise(Exception("GEBCO data not found"))
         else:
@@ -471,7 +485,7 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
         Multiplier to topography/bathymetry height
     """
     if lv is None:
-       lv = lavavu.Viewer(border=False, axis=False, resolution=[1280,720], background=background)
+        lv = get_viewer(border=False, axis=False, resolution=[1280,720], background=background)
 
     #Custom uniforms / additional textures
     uniforms = {}
@@ -479,12 +493,12 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
     '''
     #TODO: wave shader etc for regional sections
     if waves:
-        uniforms["wavetex"] = f"{settings.BASEDIR}/sea-water-1024x1024_gs.png"
-        uniforms["wavenormal"] = f"{settings.BASEDIR}/sea-water_normals.png"
+        uniforms["wavetex"] = f"{settings.INSTALL_PATH}/sea-water-1024x1024_gs.png"
+        uniforms["wavenormal"] = f"{settings.INSTALL_PATH}/sea-water_normals.png"
         uniforms["waves"] = True;
 
     if shaders is None:
-        shaders = [f'{settings.BASEDIR}/earth_shader.vert', f'{settings.BASEDIR}/earth_shader.frag']
+        shaders = [f'{settings.INSTALL_PATH}/earth_shader.vert', f'{settings.INSTALL_PATH}/earth_shader.frag']
     '''
 
     #Split kwargs into global props, object props and uniform values
@@ -517,12 +531,12 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
         #TODO: support cropping tiled high res blue marble textures
         #Also download relief textures if not found or call process_bluemarble
         #TODO2: write a process_relief function for splitting/downloading relief from Earth_Model.ipynb
-        #colour_tex = f'{settings.BASEDIR}/data/relief/4_no_ice_clouds_mts_16k.jpg'
-        colour_tex = f'{settings.BASEDIR}/data/bluemarble/source_full/world.200412.3x21600x10800.jpg'
-        #colour_tex = f'{settings.BASEDIR}/data/landmask/world.oceanmask.21600x10800.png'
+        #colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
+        colour_tex = f'{settings.DATA_PATH}/bluemarble/source_full/world.200412.3x21600x10800.jpg'
+        #colour_tex = f'{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png'
         uniforms["bluemarble"] = True;
     elif texture == 'relief':
-        colour_tex = f'{settings.BASEDIR}/data/relief/4_no_ice_clouds_mts_16k.jpg'
+        colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
     else:
         colour_tex = texture
 
@@ -585,7 +599,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         Provide a background colour string, X11 colour name or hex RGB
     """
     if lv is None:
-       lv = lavavu.Viewer(border=False, axis=False, resolution=[1280,720], background=background)
+        lv = get_viewer(border=False, axis=False, resolution=[1280,720], background=background)
     
     topo = load_topography_cubemap(settings.GRIDRES, radius, vertical_exaggeration)
     if when is None:
@@ -596,16 +610,16 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     uniforms["radius"] = radius
 
     if texture == 'bluemarble':
-        texture = '{basedir}/data/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
+        texture = '{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
         uniforms["bluemarble"] = True;
         if waves is None: waves = True
     elif texture == 'relief':
         process_relief() #Ensure images available
-        texture = '{basedir}/data/relief/cubemap_{texres}/{face}_relief_{texres}.png'
+        texture = '{basedir}/relief/cubemap_{texres}/{face}_relief_{texres}.png'
 
     #Waves - load textures as shared
-    lv.texture("wavetex", f"{settings.BASEDIR}/sea-water-1024x1024_gs.png")
-    lv.texture("wavenormal", f"{settings.BASEDIR}/sea-water_normals.png")
+    lv.texture("wavetex", f"{settings.INSTALL_PATH}/sea-water-1024x1024_gs.png")
+    lv.texture("wavenormal", f"{settings.INSTALL_PATH}/sea-water_normals.png")
     #Need to set the property too or will not know to load the texture
     if waves is None: waves = False
     uniforms["wavetex"] = ""
@@ -613,7 +627,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     uniforms["waves"] = waves;
 
     if shaders is None:
-        shaders = [f'{settings.BASEDIR}/earth_shader.vert', f'{settings.BASEDIR}/earth_shader.frag']
+        shaders = [f'{settings.INSTALL_PATH}/earth_shader.vert', f'{settings.INSTALL_PATH}/earth_shader.frag']
 
     #Split kwargs into global props, object props and uniform values
     objargs = {}
@@ -629,7 +643,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     for f in ['F', 'R', 'B', 'L', 'U', 'D']:
         verts = topo[f]
 
-        texfn = texture.format(basedir=settings.BASEDIR, face=f, texres=settings.TEXRES, month=month)
+        texfn = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month)
 
         obj = lv.triangles(name=f+name, vertices=verts, texture=texfn,
                            fliptexture=False, flip=f in ['F', 'L', 'D'], #Reverse facing
@@ -663,15 +677,15 @@ def update_earth_datetime(lv, when, name = '', texture=None, sunlight=False, ble
     factor = d/days
 
     if texture is None:
-        texture = '{basedir}/data/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
+        texture = '{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
 
     if 'bluemarble' in texture:
         #Check texture exists, if not download and process
         process_bluemarble(when, blendtex=blendtex)
 
     for f in ['F', 'R', 'B', 'L', 'U', 'D']:
-        texfn = texture.format(basedir=settings.BASEDIR, face=f, texres=settings.TEXRES, month=month)
-        texfn2 = texture.format(basedir=settings.BASEDIR, face=f, texres=settings.TEXRES, month=month2)
+        texfn = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month)
+        texfn2 = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month2)
         assert(os.path.exists(texfn))
         assert(os.path.exists(texfn2))
         o = f + name
@@ -1017,18 +1031,19 @@ def load_mask(res_y=None, masktype='watermask', cropbox=None):
     """
     if res_y is None: res_y = settings.FULL_RES_Y
     #Get the tiled high res images
-    if len(glob.glob(f'{settings.BASEDIR}/data/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz')) < 8:
+    os.makedirs(settings.DATA_PATH / 'landmask/source_tiled', exist_ok=True)
+    if len(glob.glob(f'{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz')) < 8:
         import datetime
         #Download tiles
         for t in bm_tiles:
             #https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
             url = f'https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz'
             #print(url)
-            filename = download(url, f'{settings.BASEDIR}/data/landmask/source_tiled')
+            filename = download(url, f'{settings.DATA_PATH}/landmask/source_tiled')
             #print(filename)
 
     #Calculate full image res to use for specified TEXRES
-    ffn = f'{settings.BASEDIR}/data/landmask/world.{masktype}.{2*res_y}x{res_y}.png'
+    ffn = f'{settings.DATA_PATH}/landmask/world.{masktype}.{2*res_y}x{res_y}.png'
     if not os.path.exists(ffn):
         #Combine 4x2 image tiles into single image
         #[A1][B1][C1][D1]
@@ -1037,11 +1052,11 @@ def load_mask(res_y=None, masktype='watermask', cropbox=None):
         for t in bm_tiles:
             x = (ord(t[0]) - ord('A'))
             y = 1 if int(t[1]) == 2 else 0
-            paste_image(f'{settings.BASEDIR}/data/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz', x, y, mask)
+            paste_image(f'{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz', x, y, mask)
         
         #Save full mask in various resolutions
         for res in [(86400,43200), (43200,21600), (21600,10800)]:
-            r_fn = f'{settings.BASEDIR}/data/landmask/world.{masktype}.{res[0]}x{res[1]}.png'
+            r_fn = f'{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png'
             if not os.path.exists(r_fn):
                 #Create medium res mask image
                 mimg = Image.fromarray(mask)
@@ -1076,7 +1091,8 @@ def process_relief(overwrite=False, redownload=False):
     """
     #Check for processed imagery
     #print(midx,month_name,settings.TEXRES)
-    pdir = f'{settings.BASEDIR}/data/relief/cubemap_{settings.TEXRES}'
+    pdir = f'{settings.DATA_PATH}/relief/cubemap_{settings.TEXRES}'
+    os.makedirs(pdir, exist_ok=True)
     cubemaps = len(glob.glob(f'{pdir}/*_relief_{settings.TEXRES}.png'))
     #print(cur_month, next_month)
     if not overwrite and cubemaps == 6:
@@ -1084,7 +1100,7 @@ def process_relief(overwrite=False, redownload=False):
 
     #Check for source images, download if not found
     colour_tex = '4_no_ice_clouds_mts_16k.jpg'
-    sdir = f'{settings.BASEDIR}/data/relief'
+    sdir = f'{settings.DATA_PATH}/relief'
     src = f'{sdir}/{colour_tex}'
     if redownload or not os.path.exists(src):
         print('Downloading missing source images...')
@@ -1146,7 +1162,8 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         month_name2 = datetime.date(2004, midx2, 1).strftime('%B')
     #Check for processed imagery
     #print(midx,month_name,settings.TEXRES)
-    pdir = f'{settings.BASEDIR}/data/bluemarble/cubemap_{settings.TEXRES}'
+    pdir = f'{settings.DATA_PATH}/bluemarble/cubemap_{settings.TEXRES}'
+    os.makedirs(pdir, exist_ok=True)
     cur_month = len(glob.glob(f'{pdir}/*_blue_marble_{month_name}_{settings.TEXRES}.png'))
     next_month = len(glob.glob(f'{pdir}/*_blue_marble_{month_name2}_{settings.TEXRES}.png'))
     #print(cur_month, next_month)
@@ -1156,7 +1173,8 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         return #Full year processed images present
 
     #Check for source images, download if not found
-    sdir = f'{settings.BASEDIR}/data/bluemarble/source_tiled'
+    sdir = f'{settings.DATA_PATH}/bluemarble/source_tiled'
+    os.makedirs(sdir, exist_ok=True)
     all_tiles = len(glob.glob(f'{sdir}/world.2004*.3x21600x21600.*.jpg'))
     month_tiles = len(glob.glob(f'{sdir}/world.2004{midx}.3x21600x21600.*.jpg'))
     months = range(1,13)
@@ -1168,6 +1186,7 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
             months = [midx]
     if redownload or month_tiles < 8 and all_tiles < 8*12:
         print('Downloading missing source images...')
+        os.makedirs(f'{settings.DATA_PATH}/bluemarble/source_full', exist_ok=True)
         #Still checks for existing files, but compares size with server copy, which takes time
         for m in months:
             dt = datetime.date(2004, m, 1)
@@ -1177,7 +1196,7 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
             # 21600x10800 1/4 resolution single images (2km grid)
             url = f'https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/world_2km/world.{ym}.3x21600x10800.jpg'
             print(f' - {url}')
-            filename = download(url, f'{settings.BASEDIR}/data/bluemarble/source_full', overwrite=redownload)
+            filename = download(url, f'{settings.DATA_PATH}/bluemarble/source_full', overwrite=redownload)
         
             #Tiles are as above with .[ABCD][12].jpg (500m grid)
             #Download monthly tiles
@@ -1212,7 +1231,7 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
                 paste_image(f'{sdir}/world.{ym}.3x21600x21600.{t}.jpg', x, y, full)
         else:
             #Medium resolution, full image is detailed enough for 4096^2 textures and below
-            img = Image.open(f'{settings.BASEDIR}/data/bluemarble/source_full/world.{ym}.3x21600x10800.jpg')
+            img = Image.open(f'{settings.DATA_PATH}/bluemarble/source_full/world.{ym}.3x21600x10800.jpg')
             full = np.array(img)
         
         #Set ocean to semi-transparent
@@ -1231,7 +1250,7 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
                         tex = lavavu.Image(data=textures[f])
                         tex.save(tfn)
 
-def process_gebco(gebco_file='GEBCO_2020.nc', overwrite=False, redownload=False):
+def process_gebco(overwrite=False, redownload=False):
     """
     # Full res GEBCO .nc grid
 
@@ -1244,8 +1263,8 @@ def process_gebco(gebco_file='GEBCO_2020.nc', overwrite=False, redownload=False)
     - NC version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/
     - Sub-ice topo version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2023_sub_ice_topo/zip/
     """ 
-    subsampled = len(glob.glob(f'{settings.BASEDIR}/data/gebco/gebco_equirectangular_*_x_*'))
-    cubemap = len(glob.glob(f'{settings.BASEDIR}/data/gebco/gebco_cubemap_{settings.GRIDRES}.npz'))
+    subsampled = len(glob.glob(f'{settings.DATA_PATH}/gebco/gebco_equirectangular_*_x_*'))
+    cubemap = len(glob.glob(f'{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}.npz'))
     if not overwrite and subsampled == 2 and cubemap == 1:
         return #Processed data exists
 
@@ -1259,17 +1278,19 @@ def process_gebco(gebco_file='GEBCO_2020.nc', overwrite=False, redownload=False)
     '''
 
     #Attempt to load full GEBCO
-    if not gebco_file or not os.path.exists(gebco_file):
-        print('Please pass path to GEBCO_2020.nc in arg `gebco_file`')
+    if not os.path.exists(settings.GEBCO_PATH):
+        print('Please pass path to GEBCO_2020.nc in settings.GEBCO_PATH')
         print('https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/')
+        raise(FileNotFoundError('Missing GEBCO path'))
 
-    ds = xr.open_dataset(gebco_file)
+    ds = xr.open_dataset(settings.GEBCO_PATH)
 
     #Subsampled full equirectangular datasets
     #(keep in lat/lon)
     #Export subsampled equirectangular data for regional clipping at lower res
     def export_subsampled(ss):
-        fn = f'{settings.BASEDIR}/data/gebco/gebco_equirectangular_{86400//ss}_x_{43200//ss}'
+        os.makedirs(settings.DATA_PATH / 'gebco', exist_ok=True)
+        fn = f'{settings.DATA_PATH}/gebco/gebco_equirectangular_{86400//ss}_x_{43200//ss}'
         print(fn)
         if overwrite or not os.path.exists(fn + '.npz'):
             height_ss = ds['elevation'][::ss, ::ss].to_numpy()
@@ -1287,11 +1308,11 @@ def process_gebco(gebco_file='GEBCO_2020.nc', overwrite=False, redownload=False)
     height.shape
 
     #Convert from M to Mm
-    heights = heights * 1e-6
+    height = height * 1e-6
 
     #Split the equirectangular array into cube map tiles
     #(cache/load to save time)
-    fn = f'{settings.BASEDIR}/data/gebco/gebco_cubemap_{settings.GRIDRES}'
+    fn = f'{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}'
     if os.path.exists(fn + '.npz'):
         heights = np.load(fn + '.npz')
     else:
