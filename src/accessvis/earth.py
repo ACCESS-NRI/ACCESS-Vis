@@ -33,7 +33,7 @@ class Settings():
     MAXGRIDRES = 4096
     #Where data is stored, defaults to module dir unless on gadi
     INSTALL_PATH = Path(__file__).parents[0]
-    if 'gadi.nci.org.au' in os.getenv('HOSTNAME'):
+    if 'gadi.nci.org.au' in os.getenv('HOSTNAME', ''):
         DATA_PATH = Path('/g/data/nf33/public/data/accessvis')
         HEADLESS = True
     else:
