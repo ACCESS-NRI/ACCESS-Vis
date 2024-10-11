@@ -7,7 +7,6 @@ import os
 import sys
 Image.MAX_IMAGE_PIXELS = None
 from pathlib import Path
-import quaternion as quat
 import math
 import datetime
 import lavavu
@@ -17,6 +16,7 @@ import glob
 from contextlib import closing
 import xarray as xr
 import matplotlib
+import quaternion as quat
 
 from utils import is_ipython, is_notebook, download, pushd
 
