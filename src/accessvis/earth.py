@@ -38,10 +38,14 @@ class Settings():
         HEADLESS = True
     else:
         DATA_PATH = INSTALL_PATH / 'data'
+        from importlib import metadata
         try:
             import moderngl
             HEADLESS = True
-        except (ImportError) as e:
+            #If this fails, lavavu-osmesa was installed
+            #headless not required because always in headless mode
+            md = metadata.metadata('lavavu')
+        except (ImportError, metadata.PackageNotFoundError) as e:
             HEADLESS = False
     GEBCO_PATH = DATA_PATH / 'gebco' / 'GEBCO_2020.nc'
 
