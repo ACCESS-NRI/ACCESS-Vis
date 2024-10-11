@@ -31,6 +31,7 @@ class Settings():
     TEXRES = 2048
     GRIDRES = 1024
     MAXGRIDRES = 4096
+
     #Where data is stored, defaults to module dir unless on gadi
     INSTALL_PATH = Path(__file__).parents[0]
     if 'gadi.nci.org.au' in os.getenv('HOSTNAME', ''):
@@ -38,15 +39,8 @@ class Settings():
         HEADLESS = True
     else:
         DATA_PATH = INSTALL_PATH / 'data'
-        from importlib import metadata
-        try:
-            import moderngl
-            HEADLESS = True
-            #If this fails, lavavu-osmesa was installed
-            #headless not required because always in headless mode
-            md = metadata.metadata('lavavu')
-        except (ImportError, metadata.PackageNotFoundError) as e:
-            HEADLESS = False
+        HEADLESS = False
+
     GEBCO_PATH = DATA_PATH / 'gebco' / 'GEBCO_2020.nc'
 
     def __repr__(self):
@@ -55,6 +49,17 @@ class Settings():
 settings = Settings()
 
 def get_viewer(*args, **kwargs):
+    if settings.HEADLESS:
+        from importlib import metadata
+        try:
+            #If this fails, lavavu-osmesa was installed
+            #headless not required because always in headless mode
+            md = metadata.metadata('lavavu')
+            #Requires moderngl for EGL headless context
+            import moderngl
+        except (ImportError, metadata.PackageNotFoundError) as e:
+            settings.HEADLESS = False
+
     if settings.HEADLESS:
         return lavavu.Viewer(*args, context="moderngl", **kwargs)
     else:
