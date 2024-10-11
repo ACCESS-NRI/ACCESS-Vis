@@ -43,7 +43,7 @@ class Settings():
             HEADLESS = True
         except (ImportError) as e:
             HEADLESS = False
-    GEBCO_PATH = DATA_PATH / 'GEBCO_2020.nc'
+    GEBCO_PATH = DATA_PATH / 'gebco' / 'GEBCO_2020.nc'
 
     def __repr__(self):
         return f'resolution {self.RES}, {self.FULL_RES_Y}, texture {self.TEXRES}, grid {self.GRIDRES}, maxgrid {self.MAXGRIDRES} basedir {self.DATA_PATH}'
