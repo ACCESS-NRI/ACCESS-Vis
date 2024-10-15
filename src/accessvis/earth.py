@@ -361,6 +361,7 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
     os.makedirs(settings.DATA_PATH / 'sphere', exist_ok=True)
 
     #For each cube face...
+    minmax = []
     for f in ['F', 'R', 'B', 'L', 'U', 'D']:
         if f in cdata:
             verts = cdata[f]
@@ -391,10 +392,15 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
         if heightmaps:
             #Apply radius and heightmap
             verts *= (heightmaps[f] * vertical_exaggeration + radius) 
+            minmax += [heightmaps[f].min(), heightmaps[f].max()]
         else:
             #Apply radius only
             verts *= radius
         sdata[f] = verts
+
+    #Save height range
+    minmax = np.array(minmax)
+    sdata['range'] = (minmax.min(), minmax.max())
 
     #Save compressed un-scaled vertex data
     if cache:
@@ -638,6 +644,13 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     uniforms["wavetex"] = ""
     uniforms["wavenormal"] = ""
     uniforms["waves"] = waves;
+
+    #Pass in height range of topography as this is dependent on vertical exaggeration
+    #Convert metres to Mm and multiply by vertical exag
+    #hrange = np.array([-10952, 8627]) * 1e-6 * vertical_exaggeration
+    hrange = np.array(topo['range']) * vertical_exaggeration
+    uniforms["heightmin"] = hrange[0];
+    uniforms["heightmax"] = hrange[1];
 
     if shaders is None:
         shaders = [f'{settings.INSTALL_PATH}/earth_shader.vert', f'{settings.INSTALL_PATH}/earth_shader.frag']

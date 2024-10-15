@@ -35,9 +35,13 @@ uniform float blendFactor = -1.0;
 uniform sampler2D data;
 uniform int dataMode = -1; //-1 = don't plot, 0 = plot everywhere, 1 = plot on ocean, 2 = plot on land
 uniform float dataAlpha = 0.0;
-uniform vec4 ocean; //Ocean colour override
+uniform vec4 ocean = vec4(0.0, 0.0, 0.0, 1.0); //Ocean colour override
+uniform float depthColour = 2.0; //Power of bathymetry depth on ocean colour, 0=None, 1=linear, 2=^2 etc
 uniform bool waves = false;
 uniform bool bathymetry = false;
+//Topo/bathy range
+uniform float heightmin;
+uniform float heightmax;
 
 //Allow differing brightness,contrast,saturation over ocean
 uniform float ocean_brightness = 0.0;
@@ -130,8 +134,6 @@ if (blendFactor >= 0.0)
   //if ((fColour.z > 0.5 && fColour.x < 0.3 && fColour.y > 0.3)) // || (fColour.x * fColour.y * fColour.z > 0.25))
   
   //Ocean/land mask, baked into colour texture alpha channel
-//vec4 Colour = texture(uTexture, vTexCoord);
-//mask = Colour.a;
   bool water = mask <= 0.7;
   //bool water = mask >= 0.85 && depth <= 1.0;
   //Water calc for shaded relief textures
@@ -151,38 +153,56 @@ if (blendFactor >= 0.0)
     //N = normalize(vVertex);
     //Flatten normal
     N = normalize(mat3(uNMatrix) * normalize(vVertex));
-//outColour = vec3(1.0, 0.0, 0.0, 1.0);
-//return;
   }
 
   if (water && !snow) //Sea-level ice fix, don't apply water shading
   {
     //Bathymetry is included in topo data
-    //With x10 vertical exaggeration, bathymetry max is -10952M in Mm range [-0.10952,0]
-    //TODO: FIX THIS, V_EXAG IS NOT HARD CODED, PASS IN HEIGHT MIN/MAX AS UNIFORM !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    float DMIN = -0.104809;
-    float depth = 1.0 - ((vlen - radius) / DMIN);
+    //Normalised depth [0,1] where 0 is sea level
+    float depth = ((vlen - radius) / (heightmin));
+
+    //Calculate the ocean colour
+    //if (bluemarble)
     if (!bathymetry)
     {
-      //Plotting ocean as surface, blend bathymetry with earth texture based on depth to 
-      //show sense of water depth and some blurred bathymetry detail only
+      //blend bathymetry with earth texture based on depth to 
+      //show sense of water depth and some blurred bathymetry detail
 
-        //Remove detail of lower depths by clamping to upper range
-        float depth2 = clamp(depth, 0.6, 1.0) - 0.4;
+      //Remove detail of lower depths by clamping to upper range
+      float depth2 = clamp(pow(1.0-depth, depthColour), 0.6, 1.0) - 0.4;
+      //float depth2 = pow(1.0-depth, 2*depthColour);
 
-      //Default ocean colour
+      //Default ocean colour, not used unless explicitly set
       vec3 c3 = ocean.rgb;
       float blend = ocean.a;
-      if (blend == 0.0)
+      if (blend == 0.0 || ocean.rgb == vec3(0.0, 0.0, 0.0))
       {
+        //Ignore flat colour
         c3 = vec3(40/255.0, 0.4 + min(depth2, 0.6), 255/255.0);
         blend = 0.2 * depth2;
         if (!waves)
           blend = 0.15 * depth2;
       }
-      //c3 = clamp(c3, 0.0, 1.0);
-      fColour.rgb = mix(fColour.rgb, c3, blend);
+      else
+      {
+        //Blend bathymetry with fixed ocean colour
+        c3 = mix(fColour.rgb*depth2, ocean.rgb, depth2);
+      }
 
+      fColour.rgb = mix(fColour.rgb, c3, blend);
+    }
+    else
+    {
+      //Flat ocean colour
+      float depth2 = pow(1.0-depth, depthColour);
+      vec3 c3 = ocean.rgb * pow(1.0-depth, depthColour);
+      float blend = clamp(ocean.a*sqrt(depth), 0.0, 1.0); //1.0; //depth; //ocean.a * depth;
+      fColour.rgb = mix(fColour.rgb, c3, blend);
+    }
+
+    //Plotting ocean as surface
+    if (!bathymetry && waves)
+    {
       //Apply ocean texture
       if (waves)
       {
@@ -203,7 +223,7 @@ if (blendFactor >= 0.0)
 
         //vec2 uv = vTexCoord;
         //Repeated tiling
-        uv = fract(uv * 15.0 + float(uFrame) * 0.005);
+        uv = fract(uv * 25.0 + float(uFrame) * 0.005);
         vec4 wavetex = texture(wavetex, uv);
         //Apply normal map in tangent space with TBN matrix
         //vec3 waveN = texture(wavenormal, uv).xyz;
@@ -226,41 +246,25 @@ if (blendFactor >= 0.0)
         if (mask < 0.55)
         {
           //As depth increases, show higher waves
-          float wavesize = 0.5 * (1.0-depth);
+          float wavesize = 0.5 * (depth);
           //N = mix(N3, N, min(1.25*depth, 1.0));
           N = normalize(mix(N, N3, wavesize));
           //N = mix(N3, N, depth);
           //fColour.rgb = N;
         }
-
-
       }
 
       //Enhance ocean when using darker texture
       if (bluemarble)
       {
         float mul = waves ? 1.0 : 0.5;
-        saturation = 1.0 + pow(mul*clamp(depth, 0.0, 1.0), 3.0);
+        saturation = 1.0 + pow(mul*clamp(1.0-depth, 0.0, 1.0), 3.0);
         contrast *= 1.05;
       }
 
       brightness = ocean_brightness > 0.0 ? ocean_brightness : brightness;
       contrast = ocean_contrast > 0.0 ? ocean_contrast : contrast;
       saturation = ocean_saturation > 0.0 ? ocean_saturation : saturation;
-    }
-    else
-    {
-      //Default ocean colour
-      vec3 c3 = ocean.rgb;
-      float blend = ocean.a;
-      if (blend == 0.0)
-      {
-        c3 = vec3(40/255.0, 0.4 + 0.5*depth, 255/255.0);
-        blend = depth;
-      }
-      else
-        blend = depth * blend;
-      fColour.rgb = mix(fColour.rgb, c3, blend);
     }
   }
 
@@ -319,7 +323,7 @@ if (blendFactor >= 0.0)
   //(Single sided lighting only)
   float diffuse = max(dot(N, lightDir), 0.0);
 
-  if (water) // && waves)
+  if (water && !bathymetry) // && waves)
   {
     //Increase specular highlights over water
     //TODO: uniform variable for this factor
