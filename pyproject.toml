@@ -59,6 +59,9 @@ dependencies = [
   "numpy-quaternion",
   "ipywidgets",
   "astropy",
+  "xarray",
+  "tqdm",
+  "netcdf4",
 ]
 
 # List additional groups of dependencies here (e.g. development

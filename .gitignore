@@ -7,3 +7,9 @@ __pycache__
 vid_old
 src/accessvis/data
 src/accessvis.egg-info
+
+venv/
+ENV/
+.venv/
+.env
+.idea

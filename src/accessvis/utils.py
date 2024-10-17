@@ -160,7 +160,6 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
     def try_download():
         for a in range(attempts):
             try:
-                exists = os.path.exists(filename)
                 if not overwrite and os.path.exists(filename):
                     #Get header and file size
                     #r = requests.head(url)
@@ -183,7 +182,7 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
 
                 return filename
 
-            except (Exception) as e:
+            except Exception as e:
                 print(f"Exception {e}, will retry")
                 pass
 

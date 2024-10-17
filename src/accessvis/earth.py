@@ -1404,9 +1404,9 @@ def process_gebco(overwrite=False, redownload=False):
 
     #Attempt to load full GEBCO
     if not os.path.exists(settings.GEBCO_PATH):
-        print('Please pass path to GEBCO_2020.nc in settings.GEBCO_PATH')
+        print(f'Please update the path to GEBCO_2020.nc for {settings.GEBCO_PATH=}')
         print('https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/')
-        raise(FileNotFoundError('Missing GEBCO path'))
+        raise(FileNotFoundError('Missing GEBCO path/file'))
 
     ds = xr.open_dataset(settings.GEBCO_PATH)
 
