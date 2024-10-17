@@ -327,7 +327,7 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
         np.savez_compressed(fn, **sdata)
     return sdata
 
-def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertical_exaggeration=1.0, cache=True):
+def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertical_exaggeration=1.0, cache=True, hemisphere=None):
     """
     Generate a spherical mesh from 6 cube faces, suitable for cubemap textures and
     without stretching/artifacts at the poles
@@ -348,7 +348,14 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
     cache: bool
         If true will attempt to load cached data and if not found will generate
         and save the data for next time
-
+    hemisphere: str
+        Crop the data to show a single hemisphere
+        'N' = North polar
+        'S' = South polar
+        'EW' = Antimeridian at centre (Oceania/Pacific)
+        'WE' = Prime meridian at centre (Africa/Europe)
+        'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
+        'W' = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     if resolution is None: resolution = settings.GRIDRES
     #Generate cube face grid
@@ -402,12 +409,43 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
     minmax = np.array(minmax)
     sdata['range'] = (minmax.min(), minmax.max())
 
+    #Hemisphere crop?
+    half = resolution//2
+    if hemisphere == 'N': #U
+        del sdata['D'] #Delete south
+        for f in ['F', 'R', 'B', 'L']:
+            sdata[f] = sdata[f][half::, ::, ::] #Crop bottom section
+    elif hemisphere == 'S': #D
+        del sdata['U'] #Delete north
+        for f in ['F', 'R', 'B', 'L']:
+            sdata[f] = sdata[f][0:half, ::, ::] #Crop top section
+    elif hemisphere == 'E': #R
+        del sdata['L'] #Delete W
+        for f in ['F', 'B', 'U', 'D']:
+            sdata[f] = sdata[f][::, half::, ::] #Crop left section
+    elif hemisphere == 'W': #L
+        del sdata['R'] #Delete E
+        for f in ['F', 'B', 'U', 'D']:
+            sdata[f] = sdata[f][::, 0:half, ::] #Crop right section
+    elif hemisphere == 'EW': #B
+        del sdata['F'] #Delete prime meridian
+        for f in ['R', 'L']:
+            sdata[f] = sdata[f][::, 0:half, ::] #Crop right section
+        for f in ['U', 'D']:
+            sdata[f] = sdata[f][0:half, ::, ::] #Crop top section
+    elif hemisphere == 'WE': #F
+        del sdata['B'] #Delete antimeridian
+        for f in ['R', 'L']:
+            sdata[f] = sdata[f][::, half::, ::] #Crop left section
+        for f in ['U', 'D']:
+            sdata[f] = sdata[f][half::, ::, ::] #Crop bottom section
+
     #Save compressed un-scaled vertex data
     if cache:
         np.savez_compressed(fn, **cdata)
     return sdata
 
-def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration=1, bathymetry=True):
+def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration=1, bathymetry=True, hemisphere=None):
     """
     Load topography from pre-saved data
     TODO: Support land/sea mask, document args
@@ -421,6 +459,14 @@ def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration
         Multiplier to topography/bathymetry height
     radius: float
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
+    hemisphere: str
+        Crop the data to show a single hemisphere
+        'N' = North polar
+        'S' = South polar
+        'EW' = Antimeridian at centre (Oceania/Pacific)
+        'WE' = Prime meridian at centre (Africa/Europe)
+        'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
+        'W' = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     #Load detailed topo data
     if resolution is None: resolution = settings.GRIDRES
@@ -430,7 +476,7 @@ def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration
         raise(Exception("GEBCO data not found"))
     heights = np.load(fn)
     #Apply to cubemap sphere
-    return cubemap_sphere_vertices(radius, resolution, heights, vertical_exaggeration)
+    return cubemap_sphere_vertices(radius, resolution, heights, vertical_exaggeration, hemisphere=hemisphere)
 
 def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True):
     """
@@ -568,7 +614,7 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
     return lv
     
 
-def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemarble', lighting=True, when=None, hour=None, minute=None, waves=None, sunlight=False, blendtex=True, name='', uniforms={}, shaders=None, background='black', *args, **kwargs):
+def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemarble', lighting=True, when=None, hour=None, minute=None, waves=None, sunlight=False, blendtex=True, name='', uniforms={}, shaders=None, background='black', hemisphere=None, *args, **kwargs):
     """
     Plots a spherical earth using a 6 face cubemap mesh with bluemarble textures
     and sets up seasonal texture blending and optionally, sun position,
@@ -616,11 +662,19 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         Provide a list of two custom shader file paths eg: ['vertex_shader.glsl', 'fragment_shader.glsl']
     background: str
         Provide a background colour string, X11 colour name or hex RGB
+    hemisphere: str
+        Crop the data to show a single hemisphere
+        'N' = North polar
+        'S' = South polar
+        'EW' = Antimeridian at centre (Oceania/Pacific)
+        'WE' = Prime meridian at centre (Africa/Europe)
+        'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
+        'W' = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     if lv is None:
         lv = get_viewer(border=False, axis=False, resolution=[1280,720], background=background)
     
-    topo = load_topography_cubemap(settings.GRIDRES, radius, vertical_exaggeration)
+    topo = load_topography_cubemap(settings.GRIDRES, radius, vertical_exaggeration, hemisphere=hemisphere)
     if when is None:
         when = datetime.datetime.now()
     month = when.strftime('%B')
@@ -667,6 +721,8 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
             uniforms[k] = kwargs[k]
 
     for f in ['F', 'R', 'B', 'L', 'U', 'D']:
+        if not f in topo:
+            continue #For hemisphere crops
         verts = topo[f]
 
         texfn = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month)
@@ -687,6 +743,47 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         #lv.set_properties(diffuse=0.6, ambient=0.1, specular=0.0, shininess=0.01, light=[1,1,0.98,1])
         lv.set_properties(diffuse=0.6, ambient=0.6, specular=0.3, shininess=0.04, light=[1,1,0.98,1], lightpos=lp)
 
+    #Hemisphere crop? Alter texcoords to fix half cubemap sections
+    def replace_texcoords(f, idx, lr):
+        obj = lv.objects[f+name]
+        el = np.copy(obj.data['texcoords'][0])
+        obj.cleardata('texcoords')
+        col = el[::, ::, idx]
+        if lr == 'r':
+            el[::, ::, idx] = col * 0.5 + 0.5
+        elif lr == 'l':
+            el[::, ::, idx] = col * 0.5
+        obj.texcoords(el)
+
+    if hemisphere == 'N':
+        for f in ['F', 'R', 'B', 'L']:
+            replace_texcoords(f, 1, 'r')
+        lv.rotation(90.0, 0.0, 0.0)
+    elif hemisphere == 'S':
+        for f in ['F', 'R', 'B', 'L']:
+            replace_texcoords(f, 1, 'l')
+        lv.rotation(-90.0, 0.0, 0.0)
+    elif hemisphere == 'E':
+        for f in ['F', 'B', 'U', 'D']:
+            replace_texcoords(f, 0, 'r')
+        lv.rotation(0.0, -90.0, 0.0)
+    elif hemisphere == 'W':
+        for f in ['F', 'B', 'U', 'D']:
+            replace_texcoords(f, 0, 'l')
+        lv.rotation(0.0, 90.0, 0.0)
+    elif hemisphere == 'EW':
+        for f in ['R', 'L']:
+            replace_texcoords(f, 0, 'l')
+        for f in ['U', 'D']:
+            replace_texcoords(f, 1, 'l')
+        lv.rotation(0.0, 180.0, 0.0)
+    elif hemisphere == 'WE':
+        for f in ['R', 'L']:
+            replace_texcoords(f, 0, 'r')
+        for f in ['U', 'D']:
+            replace_texcoords(f, 1, 'r')
+        lv.rotation(0.0, 0.0, 0.0)
+    lv.reload()
     return lv
 
 def update_earth_datetime(lv, when, name = '', texture=None, sunlight=False, blendtex=True):
