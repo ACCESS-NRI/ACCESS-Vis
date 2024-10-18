@@ -13,3 +13,8 @@ ENV/
 .venv/
 .env
 .idea
+
+*.png
+*.jpg
+*.jpeg
+*.mp4
