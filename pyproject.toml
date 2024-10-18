@@ -103,3 +103,6 @@ dependencies = [
 # installed, specify them here.
 package-data = {"textures" = ["*.png"], "shaders" = ["*.frag", "*.vert"]}
 
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
