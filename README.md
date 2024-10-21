@@ -1,4 +1,5 @@
-# Visualisations
+# ACCESS-Vis Python Visualisation Package for ACCESS Models.
+
 Visualisation examples and resources, including open-source 3D vis for ACCESS-NRI releases
 
 This repository is intended as a resource for complex visualisation tasks using ACCESS models and other related data sources.
