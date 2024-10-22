@@ -40,7 +40,7 @@ class Settings():
 
     # Check if running on 'gadi.nci.org.au'
     hostname = os.getenv('HOSTNAME', '')
-    if 'gadi.nci.org.au' in hostname:
+    if not DATA_PATH and 'gadi.nci.org.au' in hostname:
         project = os.getenv("PROJECT")
         user = os.getenv("USER")
         DATA_PATH = Path(f'/scratch/{project}/{user}/.accessvis')
