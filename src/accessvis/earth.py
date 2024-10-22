@@ -319,7 +319,7 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
         lv = get_viewer()
         tris0 = lv.spheres("sphere", scaling=radius, segments=quality, colour="grey", vertices=[0,0,0], fliptexture=False)
         tris0['rotate'] = [0,-90,0] #This rotates the sphere coords to align with [0,360] longitude texture
-        tris0['texture'] = 'blank.png' #Need an initial texture or texcoords will not be generated
+        tris0['texture'] = 'data/blank.png' #Need an initial texture or texcoords will not be generated
         tris0['renderer'] = 'sortedtriangles'
         lv.render()
 
@@ -567,12 +567,12 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
     '''
     #TODO: wave shader etc for regional sections
     if waves:
-        uniforms["wavetex"] = f"{settings.INSTALL_PATH}/sea-water-1024x1024_gs.png"
-        uniforms["wavenormal"] = f"{settings.INSTALL_PATH}/sea-water_normals.png"
+        uniforms["wavetex"] = f"{settings.INSTALL_PATH}/data/sea-water-1024x1024_gs.png"
+        uniforms["wavenormal"] = f"{settings.INSTALL_PATH}/data/sea-water_normals.png"
         uniforms["waves"] = True;
 
     if shaders is None:
-        shaders = [f'{settings.INSTALL_PATH}/earth_shader.vert', f'{settings.INSTALL_PATH}/earth_shader.frag']
+        shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
     '''
 
     #Split kwargs into global props, object props and uniform values
@@ -700,8 +700,8 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         texture = '{basedir}/relief/cubemap_{texres}/{face}_relief_{texres}.png'
 
     #Waves - load textures as shared
-    lv.texture("wavetex", f"{settings.INSTALL_PATH}/sea-water-1024x1024_gs.png")
-    lv.texture("wavenormal", f"{settings.INSTALL_PATH}/sea-water_normals.png")
+    lv.texture("wavetex", f"{settings.INSTALL_PATH}/data/sea-water-1024x1024_gs.png")
+    lv.texture("wavenormal", f"{settings.INSTALL_PATH}/data/sea-water_normals.png")
     #Need to set the property too or will not know to load the texture
     if waves is None: waves = False
     uniforms["wavetex"] = ""
@@ -716,7 +716,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     uniforms["heightmax"] = hrange[1];
 
     if shaders is None:
-        shaders = [f'{settings.INSTALL_PATH}/earth_shader.vert', f'{settings.INSTALL_PATH}/earth_shader.frag']
+        shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
 
     #Split kwargs into global props, object props and uniform values
     objargs = {}
