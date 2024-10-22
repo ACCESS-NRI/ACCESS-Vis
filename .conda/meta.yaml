@@ -1,0 +1,42 @@
+{% set data = load_setup_py_data(setup_file='../setup.py', from_recipe_dir=True) %}
+{% set version = data.get('version') %}
+
+package:
+  name: accessvis
+  version: "{{ version }}"
+
+source:
+  #url: "https://pypi.io/packages/source/a/access-nri-intake/accessvis-{{ version }}.tar.gz"
+
+build:
+  noarch: python
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
+
+requirements:
+  host:
+    - python
+    - pip
+    - versioneer
+  run:
+    - python >=3.9
+    - pillow
+    - matplotlib
+    - ipywidgets
+    - astropy
+    - xarray
+    - tqdm
+    - netcdf4
+    - lavavu
+
+
+about:
+  home: https://github.com/ACCESS-NRI/access-nri-intake-catalog
+  license: Apache Software
+  license_family: APACHE
+  summary: "Visualisation Package for ACCESS models"
+  doc_url: https://access-vis.readthedocs.io/en/latest
+
+extra:
+  recipe-maintainers:
+    - rbeucher
