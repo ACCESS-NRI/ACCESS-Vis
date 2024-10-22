@@ -4,10 +4,8 @@ import numpy as np
 import py360convert
 from PIL import Image
 import os
-import sys
 Image.MAX_IMAGE_PIXELS = None
 from pathlib import Path
-import math
 import datetime
 import lavavu
 import gzip
@@ -18,7 +16,7 @@ import xarray as xr
 import matplotlib
 import quaternion as quat
 
-from utils import is_ipython, is_notebook, download, pushd
+from utils import is_notebook, download, pushd
 
 MtoLL = 1.0/111133 #Rough conversion from metres to lat/lon units
 
@@ -34,13 +32,24 @@ class Settings():
 
     #Where data is stored, defaults to module dir unless on gadi
     INSTALL_PATH = Path(__file__).parents[0]
-    if 'gadi.nci.org.au' in os.getenv('HOSTNAME', ''):
-        DATA_PATH = Path('/g/data/nf33/public/data/accessvis')
+
+    # Default to non-headless mode
+    HEADLESS = False
+    # Check if the data directory is specified in environment variables
+    DATA_PATH = os.getenv("ACCESSVIS_DATA_DIR")
+
+    # Check if running on 'gadi.nci.org.au'
+    hostname = os.getenv('HOSTNAME', '')
+    if 'gadi.nci.org.au' in hostname:
+        project = os.getenv("PROJECT")
+        user = os.getenv("USER")
+        DATA_PATH = Path(f'/scratch/{project}/{user}/.accessvis')
         HEADLESS = True
     else:
-        DATA_PATH = INSTALL_PATH / 'data'
-        HEADLESS = False
+        DATA_PATH = Path.home() / ".accessvis"
 
+    os.makedirs(DATA_PATH, exist_ok=True)
+    
     GEBCO_PATH = DATA_PATH / 'gebco' / 'GEBCO_2020.nc'
 
     def __repr__(self):
