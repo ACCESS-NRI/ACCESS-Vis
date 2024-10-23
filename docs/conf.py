@@ -16,11 +16,10 @@
 
 
 # -- Project information -----------------------------------------------------
-
-project = "Basic Sphinx Example Project"
-copyright = "2022, Read the Docs core team"
-author = "Read the Docs core team"
-
+project = 'ACCESS-Vis'
+copyright = '2024, Owen Kaluza'
+author = 'Owen Kaluza'
+release = 'v0.1'
 
 # -- General configuration ---------------------------------------------------
 # -- General configuration
@@ -32,13 +31,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
 ]
-
-intersphinx_mapping = {
-    "rtd": ("https://docs.readthedocs.io/en/stable/", None),
-    "python": ("https://docs.python.org/3/", None),
-    "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
-}
-intersphinx_disabled_domains = ["std"]
+autosummary_generate = True
 
 templates_path = ["_templates"]
 

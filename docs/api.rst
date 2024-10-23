@@ -3,9 +3,12 @@ API
 
 .. autosummary::
    :toctree: generated
+   :template: custom-module-template.rst
+   :recursive:
 
-   earth
-   utils
+   accessvis
+   accessvis.earth
+   accessvis.utils
 
 
 

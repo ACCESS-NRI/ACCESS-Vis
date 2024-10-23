@@ -1,29 +1,19 @@
 Usage
 =====
 
+Example usage
+
+>>> import accessvis
+>>> accessvis.plot_earth()
+
 .. _installation:
 
 Installation
 ------------
 
-To use Lumache, first install it using pip:
-
-.. code-block:: console
-
-   (.venv) $ pip install lumache
-
-Creating recipes
-----------------
-
-To retrieve a list of random ingredients,
-you can use the ``accessvis.plot_earth()`` function:
-
-.. autofunction:: accessvis.plot_earth
+AccessVis is available on gadi using the latest `med-condaenv` environment.
 
 
+To install AccessVis locally, first install it using pip:
 
-For example:
-
->>> import accessvis
->>> accessvis.plot_earth()
-
+   ``python -m pip install --editable .``

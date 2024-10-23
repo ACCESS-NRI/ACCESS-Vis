@@ -1,19 +1,21 @@
-.. include:: ../README.rst
+Welcome to the AccessVis documentation!
+=======================================
 
-Welcome to Lumache's documentation!
-===================================
+Visualisation examples and resources, including open-source 3D vis for ACCESS-NRI releases
 
-**Lumache** (/lu'make/) is a Python library for cooks and food lovers
-that creates recipes mixing random ingredients.
-It pulls data from the `Open Food Facts database <https://world.openfoodfacts.org/>`_
-and offers a *simple* and *intuitive* API.
+This repository is intended as a resource for complex visualisation tasks using ACCESS models and other related data sources.
+
+What this space for published source code for our released visualisations which will be added here as soon as tested and ready for public release.
+
+Included the python module 'accessvis' which can be installed from here with `python -m pip install --editable .`
+
+See also the included `install.sh` to set up the jupyter kernels for running in ARE on gadi.
+
+
 
 Check out the :doc:`usage` section for further information, including
 how to :ref:`installation` the project.
 
-.. note::
-
-   This project is under active development.
 
 Contents
 --------
