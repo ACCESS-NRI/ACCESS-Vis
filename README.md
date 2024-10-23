@@ -33,4 +33,8 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
+### Config and DATA caching
+
+By default, `ACCESS-Vis` caches its data in different locations depending on the platform. On NCI Gadi, data are stored in `/scratch/$PROJECT/$USER/.accessvis`, while on other platforms, the data are cached in `$HOME/.accessvis`. However, users can customize this path by setting the `ACCESSVIS_DATA_DIR` environment variable to a directory of their choice.
+
 

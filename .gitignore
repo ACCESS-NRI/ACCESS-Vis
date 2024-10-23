@@ -5,7 +5,6 @@ notes
 build
 __pycache__
 vid_old
-src/accessvis/data
 src/accessvis.egg-info
 
 venv/
@@ -14,7 +13,6 @@ ENV/
 .env
 .idea
 
-*.png
 *.jpg
 *.jpeg
 *.mp4

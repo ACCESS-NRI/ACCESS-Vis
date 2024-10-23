@@ -101,7 +101,7 @@ dependencies = [
 [tool.setuptools]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-package-data = {"textures" = ["*.png"], "shaders" = ["*.frag", "*.vert"]}
+package-data = {"textures" = ["data/*.png"], "shaders" = ["data/*.frag", "data/*.vert"]}
 
 [build-system]
 build-backend = "setuptools.build_meta"
