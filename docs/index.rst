@@ -1,17 +1,27 @@
-.. ACCESS-Vis documentation master file, created by
-   sphinx-quickstart on Mon Oct 21 16:43:49 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Welcome to the AccessVis documentation!
+=======================================
 
-ACCESS-Vis documentation
-========================
+Visualisation examples and resources, including open-source 3D vis for ACCESS-NRI releases
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+This repository is intended as a resource for complex visualisation tasks using ACCESS models and other related data sources.
 
+What this space for published source code for our released visualisations which will be added here as soon as tested and ready for public release.
+
+Included the python module 'accessvis' which can be installed from here with `python -m pip install --editable .`
+
+See also the included `install.sh` to set up the jupyter kernels for running in ARE on gadi.
+
+
+
+Check out the :doc:`usage` section for further information, including
+how to :ref:`installation` the project.
+
+
+Contents
+--------
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
 
+   Home <self>
+   usage
+   api
