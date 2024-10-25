@@ -1,8 +1,5 @@
-import numpy as np
 import os
 import sys
-from pathlib import Path
-import datetime
 from contextlib import closing
 
 def is_ipython():
@@ -43,7 +40,7 @@ def is_notebook():
     # check for `kernel` attribute on the IPython instance
     return getattr(get_ipython(), 'kernel', None) is not None
 
-class pushd():
+class pushd:
     """
     A working directory class intended for use with contextlib.closing
 
@@ -135,6 +132,8 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
         Filename to save, default is to keep the same name as in url
     overwrite : boolean
         Always overwrite file if it exists, default is to never overwrite
+    quiet : bool
+        Reduce printed text
     attempts : int
         Number of attempts if exceptions occurr, default = 50
 
@@ -143,10 +142,8 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
     filename : str
         Output local filename
     """
-    from urllib.request import urlopen, URLError, HTTPError, Request
     from urllib.parse import urlparse
     from urllib.parse import quote
-    import http.client
 
     if filename is None:
         filename = url[url.rfind("/")+1:]
