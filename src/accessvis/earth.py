@@ -30,23 +30,32 @@ class Settings():
     GRIDRES = 1024
     MAXGRIDRES = 4096
 
-    #Where data is stored, defaults to module dir unless on gadi
     INSTALL_PATH = Path(__file__).parents[0]
 
     # Default to non-headless mode
     HEADLESS = False
+    hostname = os.getenv('HOSTNAME', '')
+    gadi = 'gadi.nci.org.au' in hostname
+    if gadi:
+        #Enable headless via moderngl when running on gadi
+        HEADLESS = True
+
+    # Where data is stored, should use public cache dir on gadi
     # Check if the data directory is specified in environment variables
-    DATA_PATH = os.getenv("ACCESSVIS_DATA_DIR")
+    DATA_PATH = Path(os.getenv("ACCESSVIS_DATA_DIR"))
 
     # Check if running on 'gadi.nci.org.au'
-    hostname = os.getenv('HOSTNAME', '')
-    if not DATA_PATH and 'gadi.nci.org.au' in hostname:
-        project = os.getenv("PROJECT")
-        user = os.getenv("USER")
-        DATA_PATH = Path(f'/scratch/{project}/{user}/.accessvis')
-        HEADLESS = True
-    else:
-        DATA_PATH = Path.home() / ".accessvis"
+    if not DATA_PATH:
+        if gadi:
+            #Use public shared data cache on gadi
+            DATA_PATH = Path('/g/data/xp65/public/apps/access-vis-data')
+            if not os.access(DATA_PATH, os.R_OK):
+                #Use /scratch
+                project = os.getenv("PROJECT")
+                user = os.getenv("USER")
+                DATA_PATH = Path(f'/scratch/{project}/{user}/.accessvis')
+        else:
+            DATA_PATH = Path.home() / ".accessvis"
 
     os.makedirs(DATA_PATH, exist_ok=True)
     
