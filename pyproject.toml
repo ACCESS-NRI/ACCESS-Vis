@@ -118,6 +118,3 @@ versionfile_build = "accessvis/_version.py"
 tag_prefix = "v"        # Tag prefix (like "v" or "release-")
 parentdir_prefix = "accessvis-"  # Directory name that matches parent directory
 
-[build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
