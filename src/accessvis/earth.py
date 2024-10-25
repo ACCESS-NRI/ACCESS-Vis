@@ -577,7 +577,7 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
     if waves:
         uniforms["wavetex"] = f"{settings.INSTALL_PATH}/data/sea-water-1024x1024_gs.png"
         uniforms["wavenormal"] = f"{settings.INSTALL_PATH}/data/sea-water_normals.png"
-        uniforms["waves"] = True;
+        uniforms["waves"] = True
 
     if shaders is None:
         shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
@@ -616,7 +616,7 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
         #colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
         colour_tex = f'{settings.DATA_PATH}/bluemarble/source_full/world.200412.3x21600x10800.jpg'
         #colour_tex = f'{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png'
-        uniforms["bluemarble"] = True;
+        uniforms["bluemarble"] = True
     elif texture == 'relief':
         colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
     else:
@@ -701,7 +701,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
 
     if texture == 'bluemarble':
         texture = '{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
-        uniforms["bluemarble"] = True;
+        uniforms["bluemarble"] = True
         if waves is None: waves = True
     elif texture == 'relief':
         process_relief() #Ensure images available
@@ -714,14 +714,14 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     if waves is None: waves = False
     uniforms["wavetex"] = ""
     uniforms["wavenormal"] = ""
-    uniforms["waves"] = waves;
+    uniforms["waves"] = waves
 
     #Pass in height range of topography as this is dependent on vertical exaggeration
     #Convert metres to Mm and multiply by vertical exag
     #hrange = np.array([-10952, 8627]) * 1e-6 * vertical_exaggeration
     hrange = np.array(topo['range']) * vertical_exaggeration
-    uniforms["heightmin"] = hrange[0];
-    uniforms["heightmax"] = hrange[1];
+    uniforms["heightmin"] = hrange[0]
+    uniforms["heightmax"] = hrange[1]
 
     if shaders is None:
         shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
