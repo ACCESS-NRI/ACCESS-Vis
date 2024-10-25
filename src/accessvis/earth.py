@@ -87,8 +87,7 @@ def set_resolution(val):
     settings.RES = val
     settings.TEXRES = pow(2, 10+val)
     settings.FULL_RES_Y = pow(2,max(val-2,0)) * 10800
-    settings.GRIDRES = pow(2, 9+val)
-    settings.GRIDRES = min(settings.GRIDRES, settings.MAXGRIDRES)
+    settings.GRIDRES = min(pow(2, 9+val), settings.MAXGRIDRES)
 
 def resolution_selection(default=1):
     #Output texture resolution setting
