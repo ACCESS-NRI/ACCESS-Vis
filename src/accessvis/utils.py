@@ -10,14 +10,14 @@ def is_ipython():
     -------
     boolean
         True if IPython detected
-        Does not necessarrily indicate running within a browser / notebook context
+        Does not necessarily indicate running within a browser / notebook context
     """
     try:
         if __IPYTHON__:
             return True
         else:
             return False
-    except:
+    except NameError:
         return False
 
 def is_notebook():
@@ -35,7 +35,7 @@ def is_notebook():
     try:
         from IPython import get_ipython
         from IPython.display import display,Image,HTML
-    except:
+    except Exception:
         return False
     # check for `kernel` attribute on the IPython instance
     return getattr(get_ipython(), 'kernel', None) is not None

@@ -32,6 +32,7 @@ class Settings:
     GRIDRES = 1024
     MAXGRIDRES = 4096
 
+    # INSTALL_PATH is used for files such as sea-water-normals.png
     INSTALL_PATH = Path(__file__).parents[0]
 
     # Default to non-headless mode
@@ -71,6 +72,17 @@ settings = Settings()
 
 
 def get_viewer(*args, **kwargs):
+    """
+
+    Parameters
+    ----------
+    arguments for lavavu.Viewer().
+    See https://lavavu.github.io/Documentation/lavavu.html#lavavu.Viewer for more documentation.
+
+    Returns
+    -------
+    return: lavavu.Viewer
+    """
     if settings.HEADLESS:
         from importlib import metadata
         try:
@@ -89,6 +101,14 @@ def get_viewer(*args, **kwargs):
 
 
 def set_resolution(val):
+    """
+    Sets the resolution of the following:
+         settings.RES, settings.TEXRES, settings.FULL_RES_Y, settings.GRIDRES
+
+    Parameters
+    ----------
+    val: Texture and geometry resolution
+    """
     settings.RES = val
     settings.TEXRES = pow(2, 10 + val)
     settings.FULL_RES_Y = pow(2, max(val - 2, 0)) * 10800
@@ -96,6 +116,17 @@ def set_resolution(val):
 
 
 def resolution_selection(default=1):
+    """
+
+    Parameters
+    ----------
+    default: resolution 1=low ... 4=high
+
+    Returns
+    -------
+    widget: ipython.widgets.Dropdown
+        Allows a user to select their desired resolution.
+    """
     # Output texture resolution setting
     desc = '''Low-res 2K - fast for testing
 Mid-res 4K - good enough for full earth views
@@ -127,6 +158,15 @@ def read_image(fn):
     """
     Reads an image and returns as a numpy array,
     also supporting gzipped images (.gz extension)
+
+    Parameters
+    ----------
+    fn: str|Path
+        The file path to an image
+
+    Returns
+    -------
+    image: numpy.ndarray
     """
     # supports .gz extraction on the fly
     p = Path(fn)
@@ -146,6 +186,15 @@ def paste_image(fn, xpos, ypos, out):
     """
     #Read an image from filename then paste a tile into a larger output image
     #Assumes output is a multiple of source tile image size and matching data type
+
+    Parameters
+    ----------
+    fn: str|Path
+        file name
+    xpos: int
+    ypos: int
+    out: np.ndarray
+        image to update
     """
     col = read_image(fn)
 
