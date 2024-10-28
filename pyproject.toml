@@ -96,12 +96,16 @@ dynamic = ["version"]
 #[project.scripts]
 #sample = "sample:main"
 
+
+
 # This is configuration specific to the `setuptools` build backend.
 # If you are using a different build backend, you will need to change this.
-[tool.setuptools]
+[tool.setuptools.packages.find]
+where = ["src"]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-package-data = {"textures" = ["src/data/*.png"], "shaders" = ["src/data/*.frag", "src/data/*.vert"]}
+[tool.setuptools.package-data]
+accessvis = ["data/*"]
 
 [build-system]
 build-backend = "setuptools.build_meta"
