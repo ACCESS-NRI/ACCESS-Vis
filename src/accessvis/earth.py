@@ -45,10 +45,11 @@ class Settings:
 
     # Where data is stored, should use public cache dir on gadi
     # Check if the data directory is specified in environment variables
-    DATA_PATH = Path(os.getenv("ACCESSVIS_DATA_DIR"))
-
-    # Check if running on 'gadi.nci.org.au'
-    if not DATA_PATH:
+    envdir = os.getenv("ACCESSVIS_DATA_DIR")
+    if envdir:
+        DATA_PATH = Path(envdir)
+    else:
+        # Check if running on 'gadi.nci.org.au'
         if gadi:
             # Use public shared data cache on gadi
             DATA_PATH = Path('/g/data/xp65/public/apps/access-vis-data')
