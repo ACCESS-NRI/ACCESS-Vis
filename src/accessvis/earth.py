@@ -1121,12 +1121,12 @@ def normalise_array(values, minimum=None, maximum=None):
 
     # Ignore nan when getting min/max
     if not minimum:
-        minimun = np.nanmin(values)
+        minimum = np.nanmin(values)
     if not maximum:
         maximum = np.nanmax(values)
 
     # Normalise
-    array = (values - minimun) / (maximum - minimun)
+    array = (values - minimum) / (maximum - minimum)
     # Clip out of [0,1] range - in case defined range is not the global minima/maxima
     array = np.clip(array, 0, 1)
 
