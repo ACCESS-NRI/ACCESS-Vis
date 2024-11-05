@@ -1016,7 +1016,7 @@ def normalise(vec):
         vn = vec / norm
     return vn
 
-def vector_align(v1, v2, up=[0,1,0], lvformat=True):
+def vector_align(v1, v2, lvformat=True):
     """
     Get a rotation quaterion to align vectors v1 with v2
 
