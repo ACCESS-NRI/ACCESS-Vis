@@ -1071,32 +1071,32 @@ def lookat(lv, pos, lookat=None, up=None):
         Up vector, defaults to Y axis [0,1,0]
     """
 
-    #Use the origin from viewer if no target provided
+    # Use the origin from viewer if no target provided
     if lookat is None:
         lookat = lv['focus']
     else:
         lv['focus'] = lookat
 
-    #Default to Y-axis up vector
+    # Default to Y-axis up vector
     if up is None:
         up = np.array([0,1,0])
 
-    #Calculate the lookat rotation matrix
-    heading = np.array(pos) - np.array(lookat) # inverse line of sight
-    zd = normalise((heading))
+    # Calculate the rotation matrix
+    heading = np.array(pos) - np.array(lookat)
+    zd = normalise(heading)
     xd = normalise(np.cross(up, zd))
     yd = normalise(np.cross(zd, xd))
     q = quat.from_rotation_matrix(np.array([xd, yd, zd]))
     q = q.normalized()
-    qr = [q.x, q.y, q.z, q.w]
 
     #Apply the rotation
-    lv.rotation(*qr)
+    lv.rotation(q.x, q.y, q.z, q.w)
 
-    #Calc translation, just zoom back by heading vector length in Z
+    # Translate back by heading vector length in Z
+    # (model origin in lavavu takes care of lookat offset)
     tr = [0, 0, -magnitude(np.array(pos) - np.array(lookat))]
 
-    #Apply translation
+    # Apply translation
     lv.translation(tr)
 
 def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None, xyz=[0.4, 0.4, 1.0]):
