@@ -16,6 +16,7 @@ from contextlib import closing
 import xarray as xr
 import matplotlib
 import quaternion as quat
+import math
 
 from utils import is_notebook, download, pushd
 
@@ -1003,6 +1004,100 @@ def vec_rotate(v, theta, axis):
     # print(v_prime) # quaternion(0.0, 2.7491163, 4.7718093, 1.9162971)
     return v_prime.imag
 
+
+def magnitude(vec):
+    return np.linalg.norm(vec)
+
+def normalise(vec):
+    norm = np.linalg.norm(vec)
+    if norm == 0:
+       vn = vec
+    else:
+        vn = vec / norm
+    return vn
+
+def vector_align(v1, v2, up=[0,1,0], lvformat=True):
+    """
+    Get a rotation quaterion to align vectors v1 with v2
+
+    Parameters
+    ----------
+    v1 : list/numpy.ndarray
+         First 3 component vector
+    v2 : list/numpy.ndarray
+         Second 3 component vector to align the first to
+
+    Returns
+    -------
+    list: quaternion to rotate v1 to v2 (in lavavu format)
+    """
+
+    #Check for parallel or opposite
+    v1 = normalise(np.array(v1))
+    v2 = normalise(np.array(v2))
+    epsilon = np.finfo(np.float32).eps
+    one_minus_eps = 1.0 - epsilon
+    if np.dot(v1, v2) > one_minus_eps:    #  1.0
+        #No rotation
+        return [0,0,0,1]
+    elif np.dot(v1, v2) < -one_minus_eps: # -1.0
+        #180 rotation about Y
+        return [0,1,0,1]
+    xyz = np.cross(v1, v2)
+    l1 = np.linalg.norm(v1)
+    l2 = np.linalg.norm(v2)
+    w = math.sqrt((l1*l1) * (l2*l2)) + np.dot(v1, v2)
+    qr = quat.quaternion(w, xyz[0], xyz[1], xyz[2])
+    qr = qr.normalized()
+    #Return in LavaVu quaternion format
+    if lvformat:
+        return [qr.x, qr.y, qr.z, qr.w]
+    else:
+        return qr
+
+def lookat(lv, pos, lookat=None, up=None):
+    """
+    Set the camera with a position coord and lookat coord
+
+    Parameters
+    ----------
+    lv : lavavu.Viewer
+        The viewer object
+    pos : list/numpy.ndarray
+        Camera position in world coords
+    lookat : list/numpy.ndarray
+        Look at position in world coords, defaults to model origin
+    up : list/numpy.ndarray
+        Up vector, defaults to Y axis [0,1,0]
+    """
+
+    #Use the origin from viewer if no target provided
+    if lookat is None:
+        lookat = lv['focus']
+    else:
+        lv['focus'] = lookat
+
+    #Default to Y-axis up vector
+    if up is None:
+        up = np.array([0,1,0])
+
+    #Calculate the lookat rotation matrix
+    heading = np.array(pos) - np.array(lookat) # inverse line of sight
+    zd = normalise((heading))
+    xd = normalise(np.cross(up, zd))
+    yd = normalise(np.cross(zd, xd))
+    q = quat.from_rotation_matrix(np.array([xd, yd, zd]))
+    q = q.normalized()
+    qr = [q.x, q.y, q.z, q.w]
+
+    #Apply the rotation
+    lv.rotation(*qr)
+
+    #Calc translation, just zoom back by heading vector length in Z
+    tr = [0, 0, -magnitude(np.array(pos) - np.array(lookat))]
+
+    #Apply translation
+    lv.translation(tr)
 
 def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None, xyz=[0.4, 0.4, 1.0]):
     """
