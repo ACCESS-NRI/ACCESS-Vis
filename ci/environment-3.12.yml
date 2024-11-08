@@ -1,0 +1,21 @@
+name: access-nri-intake-test
+channels:
+  - conda-forge
+  - accessnri
+  - defaults
+dependencies:
+  - python==3.12
+  - pillow
+  - matplotlib
+  - ipywidgets
+  - astropy
+  - tqdm
+  - netcdf4
+  - pre-commit
+  - pytest
+  - xarray
+  - pip
+  - pip:
+    - lavavu
+    - codecov
+    - pytest-cov
