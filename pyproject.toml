@@ -122,3 +122,9 @@ versionfile_build = "accessvis/_version.py"
 tag_prefix = "v"        # Tag prefix (like "v" or "release-")
 parentdir_prefix = "accessvis-"  # Directory name that matches parent directory
 
+[tool.ruff]
+line-length = 88
+select = ["E", "F"]
+extend-select = ["I"]
+ignore = ["E501", "F403"]
+

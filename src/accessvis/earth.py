@@ -1,24 +1,24 @@
 # https://github.com/sunset1995/py360convert
 # #!pip install py360convert
+import datetime
+import glob
+import gzip
+import math
+import os
+from contextlib import closing
+from io import BytesIO
+from pathlib import Path
+
+import lavavu
+import matplotlib
 import numpy as np
 import py360convert
+import quaternion as quat
+import xarray as xr
 from PIL import Image
-import os
+from utils import download, is_notebook, pushd
 
 Image.MAX_IMAGE_PIXELS = None
-from pathlib import Path
-import datetime
-import lavavu
-import gzip
-from io import BytesIO
-import glob
-from contextlib import closing
-import xarray as xr
-import matplotlib
-import quaternion as quat
-import math
-
-from utils import is_notebook, download, pushd
 
 MtoLL = 1.0 / 111133  # Rough conversion from metres to lat/lon units
 
@@ -38,8 +38,8 @@ class Settings:
 
     # Default to non-headless mode
     HEADLESS = False
-    hostname = os.getenv('HOSTNAME', '')
-    gadi = 'gadi.nci.org.au' in hostname
+    hostname = os.getenv("HOSTNAME", "")
+    gadi = "gadi.nci.org.au" in hostname
     if gadi:
         # Enable headless via moderngl when running on gadi
         HEADLESS = True
@@ -53,21 +53,21 @@ class Settings:
         # Check if running on 'gadi.nci.org.au'
         if gadi:
             # Use public shared data cache on gadi
-            DATA_PATH = Path('/g/data/xp65/public/apps/access-vis-data')
+            DATA_PATH = Path("/g/data/xp65/public/apps/access-vis-data")
             if not os.access(DATA_PATH, os.R_OK):
                 # Use /scratch
                 project = os.getenv("PROJECT")
                 user = os.getenv("USER")
-                DATA_PATH = Path(f'/scratch/{project}/{user}/.accessvis')
+                DATA_PATH = Path(f"/scratch/{project}/{user}/.accessvis")
         else:
             DATA_PATH = Path.home() / ".accessvis"
 
     os.makedirs(DATA_PATH, exist_ok=True)
 
-    GEBCO_PATH = DATA_PATH / 'gebco' / 'GEBCO_2020.nc'
+    GEBCO_PATH = DATA_PATH / "gebco" / "GEBCO_2020.nc"
 
     def __repr__(self):
-        return f'resolution {self.RES}, {self.FULL_RES_Y}, texture {self.TEXRES}, grid {self.GRIDRES}, maxgrid {self.MAXGRIDRES} basedir {self.DATA_PATH}'
+        return f"resolution {self.RES}, {self.FULL_RES_Y}, texture {self.TEXRES}, grid {self.GRIDRES}, maxgrid {self.MAXGRIDRES} basedir {self.DATA_PATH}"
 
 
 settings = Settings()
@@ -87,13 +87,13 @@ def get_viewer(*args, **kwargs):
     """
     if settings.HEADLESS:
         from importlib import metadata
+
         try:
             # If this fails, lavavu-osmesa was installed
             # headless not required because always in headless mode
-            md = metadata.metadata('lavavu')
+            metadata.metadata("lavavu")
             # Requires moderngl for EGL headless context
-            import moderngl
-        except (ImportError, metadata.PackageNotFoundError) as e:
+        except (ImportError, metadata.PackageNotFoundError):
             settings.HEADLESS = False
 
     if settings.HEADLESS:
@@ -130,10 +130,10 @@ def resolution_selection(default=1):
         Allows a user to select their desired resolution.
     """
     # Output texture resolution setting
-    desc = '''Low-res 2K - fast for testing
+    desc = """Low-res 2K - fast for testing
 Mid-res 4K - good enough for full earth views
 High res 8K - better if showing close up at country scale
-Ultra-high 16K - max detail but requires a fast GPU with high memory'''
+Ultra-high 16K - max detail but requires a fast GPU with high memory"""
     if settings.RES == 0:
         set_resolution(default)
     if not is_notebook():
@@ -141,14 +141,20 @@ Ultra-high 16K - max detail but requires a fast GPU with high memory'''
     print(desc)
     # from IPython.display import display
     import ipywidgets as widgets
+
     w = widgets.Dropdown(
-        options=[('Low-res 2K', 1), ('Mid-res 4K', 2), ('High-res 8K', 3), ('Ultra-high-res 16K', 4)],
+        options=[
+            ("Low-res 2K", 1),
+            ("Mid-res 4K", 2),
+            ("High-res 8K", 3),
+            ("Ultra-high-res 16K", 4),
+        ],
         value=settings.RES,
-        description='Detail:',
+        description="Detail:",
     )
 
     def on_change(change):
-        if change and change['type'] == 'change' and change['name'] == 'value':
+        if change and change["type"] == "change" and change["name"] == "value":
             set_resolution(w.value)
 
     w.observe(on_change)
@@ -173,8 +179,14 @@ def read_image(fn):
     # supports .gz extraction on the fly
     p = Path(fn)
     # print(p.suffixes, p.suffixes[-2].lower())
-    if p.suffix == '.gz' and p.suffixes[-2].lower() in ['.tif', '.tiff', '.png', '.jpg', '.jpeg']:
-        with gzip.open(fn, 'rb') as f:
+    if p.suffix == ".gz" and p.suffixes[-2].lower() in [
+        ".tif",
+        ".tiff",
+        ".png",
+        ".jpg",
+        ".jpeg",
+    ]:
+        with gzip.open(fn, "rb") as f:
             file_content = f.read()
             buffer = BytesIO(file_content)
             image = Image.open(buffer)
@@ -204,7 +216,7 @@ def paste_image(fn, xpos, ypos, out):
     xoff = xpos * col.shape[0]
     yoff = ypos * col.shape[1]
     # print(f'{yoff}:{yoff+col.shape[1]}, {xoff}:{xoff+col.shape[0]}')
-    out[yoff:yoff + col.shape[1], xoff:xoff + col.shape[0]] = col
+    out[yoff : yoff + col.shape[1], xoff : xoff + col.shape[0]] = col
 
 
 def latlon_to_3D(lat, lon, alt=0):
@@ -233,7 +245,7 @@ def latlon_to_3D_true(lat, lon, alt=0, flattening=1.0 / 298.257223563):
 
     # Flattening factor WGS84 Model
     FF = (1.0 - np.float64(flattening)) ** 2
-    C = 1 / np.sqrt(cos_lat ** 2 + FF * sin_lat ** 2)
+    C = 1 / np.sqrt(cos_lat**2 + FF * sin_lat**2)
     S = C * FF
 
     x = (rad * C + alt) * cos_lat * np.cos(lon_r)
@@ -254,7 +266,7 @@ def split_tex(data, res, flip=[]):
         data = data.reshape(data.shape[0], data.shape[1], 1)
     channels = data.shape[2]
     # Convert equirectangular to cubemap
-    out = py360convert.e2c(data, face_w=res, mode='bilinear', cube_format='dict')
+    out = py360convert.e2c(data, face_w=res, mode="bilinear", cube_format="dict")
     tiles = {}
     for o in out:
         # print(o, out[o].shape)
@@ -275,27 +287,27 @@ def draw_latlon_grid(base_img, out_fn, lat=30, lon=30, linewidth=5, colour=0):
     image = Image.open(base_img)
 
     # Set the gridding interval
-    x_div = 360. / lat  # degrees grid in X [0,360]
-    y_div = 180. / lon  # degree grid in Y [-90,90]
+    x_div = 360.0 / lat  # degrees grid in X [0,360]
+    y_div = 180.0 / lon  # degree grid in Y [-90,90]
     interval_x = round(image.size[0] / x_div)
     interval_y = round(image.size[1] / y_div)
 
     # Vertical lines
-    l = round(linewidth / 2)
+    lw = round(linewidth / 2)
     for i in range(0, image.size[0], interval_x):
         for j in range(image.size[1]):
-            for k in range(-l, l):
+            for k in range(-lw, lw):
                 if i + k < image.size[0]:
                     image.putpixel((i + k, j), colour)
     # Horizontal lines
     for i in range(image.size[0]):
         for j in range(0, image.size[1], interval_y):
             # image.putpixel((i, j), colour)
-            for k in range(-l, l):
+            for k in range(-lw, lw):
                 if j + k < image.size[1]:
                     image.putpixel((i, j + k), colour)
 
-    display(image)
+    # display(image)
     image.save(out_fn)
 
 
@@ -351,9 +363,14 @@ def crop_img_uv(img, cropbox):
         lat = int(v0 * img.shape[0]), int(v1 * img.shape[0])
         lon = int(u0 * img.shape[1]), int(u1 * img.shape[1])
         print(lat, lon)
-        return img[lat[0]: lat[1], lon[0]: lon[1]]
-    elif hasattr(img, 'crop'):
-        area = (int(u0 * img.size[0]), int(v0 * img.size[1]), int(u1 * img.size[0]), int(v1 * img.size[1]))
+        return img[lat[0] : lat[1], lon[0] : lon[1]]
+    elif hasattr(img, "crop"):
+        area = (
+            int(u0 * img.size[0]),
+            int(v0 * img.size[1]),
+            int(u1 * img.size[0]),
+            int(v1 * img.size[1]),
+        )
         return img.crop(area)
     else:
         print("Unknown type: ", type(img))
@@ -372,7 +389,7 @@ def crop_img_lat_lon(img, cropbox):
 def sphere_mesh(radius=1.0, quality=256, cache=True):
     """
     Generate a simple spherical mesh, not suitable for plotting accurate texture/data at the
-    poles as there will be visible pinching artifacts, 
+    poles as there will be visible pinching artifacts,
     see: cubemap_sphere_vertices() for mesh without artifacts
 
     Parameters
@@ -387,16 +404,28 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
 
     """
     # Generate cube face grid
-    fn = f'Sphere_{quality}_{radius:.4f}'
-    if cache and os.path.exists(fn + '.npz'):
-        sdata = np.load(fn + '.npz')
+    fn = f"Sphere_{quality}_{radius:.4f}"
+    if cache and os.path.exists(fn + ".npz"):
+        sdata = np.load(fn + ".npz")
     else:
         lv = get_viewer()
-        tris0 = lv.spheres("sphere", scaling=radius, segments=quality, colour="grey", vertices=[0, 0, 0],
-                           fliptexture=False)
-        tris0['rotate'] = [0, -90, 0]  # This rotates the sphere coords to align with [0,360] longitude texture
-        tris0['texture'] = 'data/blank.png'  # Need an initial texture or texcoords will not be generated
-        tris0['renderer'] = 'sortedtriangles'
+        tris0 = lv.spheres(
+            "sphere",
+            scaling=radius,
+            segments=quality,
+            colour="grey",
+            vertices=[0, 0, 0],
+            fliptexture=False,
+        )
+        tris0["rotate"] = [
+            0,
+            -90,
+            0,
+        ]  # This rotates the sphere coords to align with [0,360] longitude texture
+        tris0[
+            "texture"
+        ] = "data/blank.png"  # Need an initial texture or texcoords will not be generated
+        tris0["renderer"] = "sortedtriangles"
         lv.render()
 
         # Generate and extract sphere vertices, texcoords etc
@@ -405,7 +434,7 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
         element = tris0.data[0]
         keys = element.available.keys()
         for k in keys:
-            sdata[k] = tris0.data[k + '_copy'][0]
+            sdata[k] = tris0.data[k + "_copy"][0]
 
     # Save compressed vertex data
     if cache:
@@ -413,8 +442,14 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
     return sdata
 
 
-def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertical_exaggeration=1.0, cache=True,
-                            hemisphere=None):
+def cubemap_sphere_vertices(
+    radius=1.0,
+    resolution=None,
+    heightmaps=None,
+    vertical_exaggeration=1.0,
+    cache=True,
+    hemisphere=None,
+):
     """
     Generate a spherical mesh from 6 cube faces, suitable for cubemap textures and
     without stretching/artifacts at the poles
@@ -444,40 +479,41 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
         'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
         'W' = Western hemisphere - antimeridian to prime meridian (Americas)
     """
-    if resolution is None: resolution = settings.GRIDRES
+    if resolution is None:
+        resolution = settings.GRIDRES
     # Generate cube face grid
     sdata = {}
     cdata = {}
-    fn = f'{settings.DATA_PATH}/sphere/cube_sphere_{resolution}'
-    if cache and os.path.exists(fn + '.npz'):
-        cdata = np.load(fn + '.npz')
+    fn = f"{settings.DATA_PATH}/sphere/cube_sphere_{resolution}"
+    if cache and os.path.exists(fn + ".npz"):
+        cdata = np.load(fn + ".npz")
         cache = False  # Don't need to write again
-    os.makedirs(settings.DATA_PATH / 'sphere', exist_ok=True)
+    os.makedirs(settings.DATA_PATH / "sphere", exist_ok=True)
 
     # For each cube face...
     minmax = []
-    for f in ['F', 'R', 'B', 'L', 'U', 'D']:
+    for f in ["F", "R", "B", "L", "U", "D"]:
         if f in cdata:
             verts = cdata[f]
         else:
-            ij = np.linspace(-1., 1., resolution, dtype='float32')
+            ij = np.linspace(-1.0, 1.0, resolution, dtype="float32")
             ii, jj = np.meshgrid(ij, ij)  # 2d grid
-            zz = np.zeros(shape=ii.shape, dtype='float32')  # 3rd dim
-            if f == 'F':  ##
+            zz = np.zeros(shape=ii.shape, dtype="float32")  # 3rd dim
+            if f == "F":  ##
                 vertices = np.dstack((ii, jj, zz + 1.0))
-            elif f == 'B':
+            elif f == "B":
                 vertices = np.dstack((ii, jj, zz - 1.0))
-            elif f == 'R':
+            elif f == "R":
                 vertices = np.dstack((zz + 1.0, jj, ii))
-            elif f == 'L':  ##
+            elif f == "L":  ##
                 vertices = np.dstack((zz - 1.0, jj, ii))
-            elif f == 'U':
+            elif f == "U":
                 vertices = np.dstack((ii, zz + 1.0, jj))
-            elif f == 'D':  ##
+            elif f == "D":  ##
                 vertices = np.dstack((ii, zz - 1.0, jj))
             # Normalise the vectors to form spherical patch  (normalised cube)
             V = vertices.ravel().reshape((-1, 3))
-            norms = np.sqrt(np.einsum('...i,...i', V, V))
+            norms = np.sqrt(np.einsum("...i,...i", V, V))
             norms = norms.reshape(resolution, resolution, 1)
             verts = vertices / norms
             cdata[f] = verts.copy()
@@ -485,7 +521,7 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
         # Scale and apply surface detail?
         if heightmaps:
             # Apply radius and heightmap
-            verts *= (heightmaps[f] * vertical_exaggeration + radius)
+            verts *= heightmaps[f] * vertical_exaggeration + radius
             minmax += [heightmaps[f].min(), heightmaps[f].max()]
         else:
             # Apply radius only
@@ -494,37 +530,37 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
 
     # Save height range
     minmax = np.array(minmax)
-    sdata['range'] = (minmax.min(), minmax.max())
+    sdata["range"] = (minmax.min(), minmax.max())
 
     # Hemisphere crop?
     half = resolution // 2
-    if hemisphere == 'N':  # U
-        del sdata['D']  # Delete south
-        for f in ['F', 'R', 'B', 'L']:
+    if hemisphere == "N":  # U
+        del sdata["D"]  # Delete south
+        for f in ["F", "R", "B", "L"]:
             sdata[f] = sdata[f][half::, ::, ::]  # Crop bottom section
-    elif hemisphere == 'S':  # D
-        del sdata['U']  # Delete north
-        for f in ['F', 'R', 'B', 'L']:
+    elif hemisphere == "S":  # D
+        del sdata["U"]  # Delete north
+        for f in ["F", "R", "B", "L"]:
             sdata[f] = sdata[f][0:half, ::, ::]  # Crop top section
-    elif hemisphere == 'E':  # R
-        del sdata['L']  # Delete W
-        for f in ['F', 'B', 'U', 'D']:
+    elif hemisphere == "E":  # R
+        del sdata["L"]  # Delete W
+        for f in ["F", "B", "U", "D"]:
             sdata[f] = sdata[f][::, half::, ::]  # Crop left section
-    elif hemisphere == 'W':  # L
-        del sdata['R']  # Delete E
-        for f in ['F', 'B', 'U', 'D']:
+    elif hemisphere == "W":  # L
+        del sdata["R"]  # Delete E
+        for f in ["F", "B", "U", "D"]:
             sdata[f] = sdata[f][::, 0:half, ::]  # Crop right section
-    elif hemisphere == 'EW':  # B
-        del sdata['F']  # Delete prime meridian
-        for f in ['R', 'L']:
+    elif hemisphere == "EW":  # B
+        del sdata["F"]  # Delete prime meridian
+        for f in ["R", "L"]:
             sdata[f] = sdata[f][::, 0:half, ::]  # Crop right section
-        for f in ['U', 'D']:
+        for f in ["U", "D"]:
             sdata[f] = sdata[f][0:half, ::, ::]  # Crop top section
-    elif hemisphere == 'WE':  # F
-        del sdata['B']  # Delete antimeridian
-        for f in ['R', 'L']:
+    elif hemisphere == "WE":  # F
+        del sdata["B"]  # Delete antimeridian
+        for f in ["R", "L"]:
             sdata[f] = sdata[f][::, half::, ::]  # Crop left section
-        for f in ['U', 'D']:
+        for f in ["U", "D"]:
             sdata[f] = sdata[f][half::, ::, ::]  # Crop bottom section
 
     # Save compressed un-scaled vertex data
@@ -533,7 +569,13 @@ def cubemap_sphere_vertices(radius=1.0, resolution=None, heightmaps=None, vertic
     return sdata
 
 
-def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration=1, bathymetry=True, hemisphere=None):
+def load_topography_cubemap(
+    resolution=None,
+    radius=6.371,
+    vertical_exaggeration=1,
+    bathymetry=True,
+    hemisphere=None,
+):
     """
     Load topography from pre-saved data
     TODO: Support land/sea mask, document args
@@ -543,7 +585,7 @@ def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration
     resolution: int
         Each face of the cube will have this many vertices on each side
         Higher for more detailed surface features
-    vertical_exaggeration: number 
+    vertical_exaggeration: number
         Multiplier to topography/bathymetry height
     radius: float
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
@@ -557,14 +599,17 @@ def load_topography_cubemap(resolution=None, radius=6.371, vertical_exaggeration
         'W' = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     # Load detailed topo data
-    if resolution is None: resolution = settings.GRIDRES
+    if resolution is None:
+        resolution = settings.GRIDRES
     process_gebco()  # Ensure data exists
-    fn = f'{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz'
+    fn = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz"
     if not os.path.exists(fn):
         raise (Exception("GEBCO data not found"))
     heights = np.load(fn)
     # Apply to cubemap sphere
-    return cubemap_sphere_vertices(radius, resolution, heights, vertical_exaggeration, hemisphere=hemisphere)
+    return cubemap_sphere_vertices(
+        radius, resolution, heights, vertical_exaggeration, hemisphere=hemisphere
+    )
 
 
 def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True):
@@ -581,23 +626,23 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
         # Attempt to load full GEBCO
         if not settings.GEBCO_PATH or not os.path.exists(settings.GEBCO_PATH):
             resolution = 21600
-            print('Please pass path to GEBCO_2020.nc in settings.GEBCO_PATH')
-            print('https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/')
-            print(f'Dropping resolution to {resolution} in order to continue...')
+            print("Please pass path to GEBCO_2020.nc in settings.GEBCO_PATH")
+            print("https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/")
+            print(f"Dropping resolution to {resolution} in order to continue...")
         else:
             ds = xr.open_dataset(settings.GEBCO_PATH)
-            heights = ds['elevation'][::subsample, ::subsample].to_numpy()
+            heights = ds["elevation"][::subsample, ::subsample].to_numpy()
             heights = np.flipud(heights)
 
     if heights is None:
         process_gebco()  # Ensure data exists
-        basefn = f'gebco_equirectangular_{resolution * 2}_x_{resolution}.npz'
-        fn = f'{settings.DATA_PATH}/gebco/{basefn}'
+        basefn = f"gebco_equirectangular_{resolution * 2}_x_{resolution}.npz"
+        fn = f"{settings.DATA_PATH}/gebco/{basefn}"
         if not os.path.exists(fn):
             raise (Exception("GEBCO data not found"))
         else:
             heights = np.load(fn)
-            heights = heights['elevation']
+            heights = heights["elevation"]
 
     if subsample > 1:
         heights = heights[::subsample, ::subsample]
@@ -609,7 +654,7 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
         # Ensure resolution matches topo grid res
         # res_y = resolution//4096 * 10800
         # res_y = max(resolution,2048) // 2048 * 10800
-        mask = load_mask(res_y=resolution, cropbox=cropbox, masktype='oceanmask')
+        mask = load_mask(res_y=resolution, cropbox=cropbox, masktype="oceanmask")
         # print(type(mask), mask.dtype, mask.min(), mask.max())
         # Use the mask to zero the bathymetry
         heights[mask < 255] = 0
@@ -617,9 +662,23 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
     return heights  # * vertical_exaggeration
 
 
-def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluemarble', lighting=True, when=None,
-                waves=False, blendtex=True, bathymetry=False, name='surface', uniforms={}, shaders=None,
-                background='black', *args, **kwargs):
+def plot_region(
+    lv=None,
+    cropbox=None,
+    vertical_exaggeration=10,
+    texture="bluemarble",
+    lighting=True,
+    when=None,
+    waves=False,
+    blendtex=True,
+    bathymetry=False,
+    name="surface",
+    uniforms={},
+    shaders=None,
+    background="black",
+    *args,
+    **kwargs,
+):
     """
     Plots a flat region of the earth with topography cropped to specified region (lat/lon bounding box coords)
     uses bluemarble textures by default and sets up seasonal texture blending based on given or current date and time
@@ -638,16 +697,18 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
         to:'path/F_mytexture_1024.png'
     name: str
         Append this label to each face object created
-    vertical_exaggeration: number 
+    vertical_exaggeration: number
         Multiplier to topography/bathymetry height
     """
     if lv is None:
-        lv = get_viewer(border=False, axis=False, resolution=[1280, 720], background=background)
+        lv = get_viewer(
+            border=False, axis=False, resolution=[1280, 720], background=background
+        )
 
     # Custom uniforms / additional textures
     uniforms = {}
 
-    '''
+    """
     #TODO: wave shader etc for regional sections
     if waves:
         uniforms["wavetex"] = f"{settings.INSTALL_PATH}/data/sea-water-1024x1024_gs.png"
@@ -656,13 +717,13 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
 
     if shaders is None:
         shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
-    '''
+    """
 
     # Split kwargs into global props, object props and uniform values
     objargs = {}
     for k in kwargs:
         if k in lv.properties:
-            if 'object' in lv.properties[k]['target']:
+            if "object" in lv.properties[k]["target"]:
                 objargs[k] = kwargs[k]
             else:
                 lv[k] = kwargs[k]
@@ -684,20 +745,22 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
     sverts[::, ::, 0:2] = xy
     sverts[::, ::, 2] = height[::, ::]
 
-    if texture == 'bluemarble':
+    if texture == "bluemarble":
         # TODO: support cropping tiled high res blue marble textures
         # Also download relief textures if not found or call process_bluemarble
         # TODO2: write a process_relief function for splitting/downloading relief from Earth_Model.ipynb
         # colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
-        colour_tex = f'{settings.DATA_PATH}/bluemarble/source_full/world.200412.3x21600x10800.jpg'
+        colour_tex = f"{settings.DATA_PATH}/bluemarble/source_full/world.200412.3x21600x10800.jpg"
         # colour_tex = f'{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png'
         uniforms["bluemarble"] = True
-    elif texture == 'relief':
-        colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
+    elif texture == "relief":
+        colour_tex = f"{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg"
     else:
         colour_tex = texture
 
-    surf = lv.triangles(name, vertices=sverts, uniforms=uniforms, cullface=True, opaque=True)  # , fliptexture=False)
+    surf = lv.triangles(
+        name, vertices=sverts, uniforms=uniforms, cullface=True, opaque=True
+    )  # , fliptexture=False)
 
     img = Image.open(colour_tex)
     cropped_img = crop_img_lat_lon(img, cropbox)
@@ -706,9 +769,26 @@ def plot_region(lv=None, cropbox=None, vertical_exaggeration=10, texture='bluema
     return lv
 
 
-def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemarble', lighting=True, when=None,
-               hour=None, minute=None, waves=None, sunlight=False, blendtex=True, name='', uniforms={}, shaders=None,
-               background='black', hemisphere=None, *args, **kwargs):
+def plot_earth(
+    lv=None,
+    radius=6.371,
+    vertical_exaggeration=10,
+    texture="bluemarble",
+    lighting=True,
+    when=None,
+    hour=None,
+    minute=None,
+    waves=None,
+    sunlight=False,
+    blendtex=True,
+    name="",
+    uniforms={},
+    shaders=None,
+    background="black",
+    hemisphere=None,
+    *args,
+    **kwargs,
+):
     """
     Plots a spherical earth using a 6 face cubemap mesh with bluemarble textures
     and sets up seasonal texture blending and optionally, sun position,
@@ -725,7 +805,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         to:'path/F_mytexture_1024.png'
     radius: float
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
-    vertical_exaggeration: number 
+    vertical_exaggeration: number
         Multiplier to topography/bathymetry height
     texture: str
         Texture set to use, 'bluemarble' for the 2004 NASA satellite data, 'relief' for a basic relief map
@@ -734,7 +814,7 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     lighting: bool
         Enable lighting, default=True, disable for flat rendering without light and shadow, or to set own lighting params later
     when: datetime
-        Provide a datetime object to set the month for texture sets that vary over the year and time for 
+        Provide a datetime object to set the month for texture sets that vary over the year and time for
         position of sun and rotation of earth when calculating sun light position
     hour: int
         If not providing 'when' datetime, provide just the hour and minute
@@ -766,29 +846,35 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         'W' = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     if lv is None:
-        lv = get_viewer(border=False, axis=False, resolution=[1280, 720], background=background)
+        lv = get_viewer(
+            border=False, axis=False, resolution=[1280, 720], background=background
+        )
 
-    topo = load_topography_cubemap(settings.GRIDRES, radius, vertical_exaggeration, hemisphere=hemisphere)
+    topo = load_topography_cubemap(
+        settings.GRIDRES, radius, vertical_exaggeration, hemisphere=hemisphere
+    )
     if when is None:
         when = datetime.datetime.now()
-    month = when.strftime('%B')
+    month = when.strftime("%B")
 
     # Custom uniforms / additional textures
     uniforms["radius"] = radius
 
-    if texture == 'bluemarble':
-        texture = '{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
+    if texture == "bluemarble":
+        texture = "{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png"
         uniforms["bluemarble"] = True
-        if waves is None: waves = True
-    elif texture == 'relief':
+        if waves is None:
+            waves = True
+    elif texture == "relief":
         process_relief()  # Ensure images available
-        texture = '{basedir}/relief/cubemap_{texres}/{face}_relief_{texres}.png'
+        texture = "{basedir}/relief/cubemap_{texres}/{face}_relief_{texres}.png"
 
     # Waves - load textures as shared
     lv.texture("wavetex", f"{settings.INSTALL_PATH}/data/sea-water-1024x1024_gs.png")
     lv.texture("wavenormal", f"{settings.INSTALL_PATH}/data/sea-water_normals.png")
     # Need to set the property too or will not know to load the texture
-    if waves is None: waves = False
+    if waves is None:
+        waves = False
     uniforms["wavetex"] = ""
     uniforms["wavenormal"] = ""
     uniforms["waves"] = waves
@@ -796,38 +882,52 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
     # Pass in height range of topography as this is dependent on vertical exaggeration
     # Convert metres to Mm and multiply by vertical exag
     # hrange = np.array([-10952, 8627]) * 1e-6 * vertical_exaggeration
-    hrange = np.array(topo['range']) * vertical_exaggeration
+    hrange = np.array(topo["range"]) * vertical_exaggeration
     uniforms["heightmin"] = hrange[0]
     uniforms["heightmax"] = hrange[1]
 
     if shaders is None:
-        shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
+        shaders = [
+            f"{settings.INSTALL_PATH}/data/earth_shader.vert",
+            f"{settings.INSTALL_PATH}/data/earth_shader.frag",
+        ]
 
     # Split kwargs into global props, object props and uniform values
     objargs = {}
     for k in kwargs:
         if k in lv.properties:
-            if 'object' in lv.properties[k]['target']:
+            if "object" in lv.properties[k]["target"]:
                 objargs[k] = kwargs[k]
             else:
                 lv[k] = kwargs[k]
         else:
             uniforms[k] = kwargs[k]
 
-    for f in ['F', 'R', 'B', 'L', 'U', 'D']:
-        if not f in topo:
+    for f in ["F", "R", "B", "L", "U", "D"]:
+        if f not in topo:
             continue  # For hemisphere crops
         verts = topo[f]
 
-        texfn = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month)
+        texfn = texture.format(
+            basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month
+        )
 
-        obj = lv.triangles(name=f + name, vertices=verts, texture=texfn,
-                           fliptexture=False, flip=f in ['F', 'L', 'D'],  # Reverse facing
-                           renderer="simpletriangles", opaque=True, cullface=True,
-                           shaders=shaders, uniforms=uniforms, **objargs)
+        lv.triangles(
+            name=f + name,
+            vertices=verts,
+            texture=texfn,
+            fliptexture=False,
+            flip=f in ["F", "L", "D"],  # Reverse facing
+            renderer="simpletriangles",
+            opaque=True,
+            cullface=True,
+            shaders=shaders,
+            uniforms=uniforms,
+            **objargs,
+        )
 
     # Setup seasonal texture for blue marble
-    if 'bluemarble' in texture:
+    if "bluemarble" in texture:
         update_earth_datetime(lv, when, name, texture, sunlight, blendtex)
 
     # Default light props
@@ -835,139 +935,157 @@ def plot_earth(lv=None, radius=6.371, vertical_exaggeration=10, texture='bluemar
         lp = sun_light(time=when if sunlight else None, hour=hour, minute=minute)
         # lv.set_properties(diffuse=0.5, ambient=0.5, specular=0.05, shininess=0.06, light=[1,1,0.98,1])
         # lv.set_properties(diffuse=0.6, ambient=0.1, specular=0.0, shininess=0.01, light=[1,1,0.98,1])
-        lv.set_properties(diffuse=0.6, ambient=0.6, specular=0.3, shininess=0.04, light=[1, 1, 0.98, 1], lightpos=lp)
+        lv.set_properties(
+            diffuse=0.6,
+            ambient=0.6,
+            specular=0.3,
+            shininess=0.04,
+            light=[1, 1, 0.98, 1],
+            lightpos=lp,
+        )
 
     # Hemisphere crop? Alter texcoords to fix half cubemap sections
     def replace_texcoords(f, idx, lr):
         obj = lv.objects[f + name]
-        el = np.copy(obj.data['texcoords'][0])
-        obj.cleardata('texcoords')
+        el = np.copy(obj.data["texcoords"][0])
+        obj.cleardata("texcoords")
         col = el[::, ::, idx]
-        if lr == 'r':
+        if lr == "r":
             el[::, ::, idx] = col * 0.5 + 0.5
-        elif lr == 'l':
+        elif lr == "l":
             el[::, ::, idx] = col * 0.5
         obj.texcoords(el)
 
-    if hemisphere == 'N':
-        for f in ['F', 'R', 'B', 'L']:
-            replace_texcoords(f, 1, 'r')
+    if hemisphere == "N":
+        for f in ["F", "R", "B", "L"]:
+            replace_texcoords(f, 1, "r")
         lv.rotation(90.0, 0.0, 0.0)
-    elif hemisphere == 'S':
-        for f in ['F', 'R', 'B', 'L']:
-            replace_texcoords(f, 1, 'l')
+    elif hemisphere == "S":
+        for f in ["F", "R", "B", "L"]:
+            replace_texcoords(f, 1, "l")
         lv.rotation(-90.0, 0.0, 0.0)
-    elif hemisphere == 'E':
-        for f in ['F', 'B', 'U', 'D']:
-            replace_texcoords(f, 0, 'r')
+    elif hemisphere == "E":
+        for f in ["F", "B", "U", "D"]:
+            replace_texcoords(f, 0, "r")
         lv.rotation(0.0, -90.0, 0.0)
-    elif hemisphere == 'W':
-        for f in ['F', 'B', 'U', 'D']:
-            replace_texcoords(f, 0, 'l')
+    elif hemisphere == "W":
+        for f in ["F", "B", "U", "D"]:
+            replace_texcoords(f, 0, "l")
         lv.rotation(0.0, 90.0, 0.0)
-    elif hemisphere == 'EW':
-        for f in ['R', 'L']:
-            replace_texcoords(f, 0, 'l')
-        for f in ['U', 'D']:
-            replace_texcoords(f, 1, 'l')
+    elif hemisphere == "EW":
+        for f in ["R", "L"]:
+            replace_texcoords(f, 0, "l")
+        for f in ["U", "D"]:
+            replace_texcoords(f, 1, "l")
         lv.rotation(0.0, 180.0, 0.0)
-    elif hemisphere == 'WE':
-        for f in ['R', 'L']:
-            replace_texcoords(f, 0, 'r')
-        for f in ['U', 'D']:
-            replace_texcoords(f, 1, 'r')
+    elif hemisphere == "WE":
+        for f in ["R", "L"]:
+            replace_texcoords(f, 0, "r")
+        for f in ["U", "D"]:
+            replace_texcoords(f, 1, "r")
         lv.rotation(0.0, 0.0, 0.0)
     lv.reload()
     return lv
 
 
-def update_earth_datetime(lv, when, name='', texture=None, sunlight=False, blendtex=True):
+def update_earth_datetime(
+    lv, when, name="", texture=None, sunlight=False, blendtex=True
+):
     # Update date/time for texture blending and lighting
     d = when.day - 1
     m = when.month
-    month = when.strftime('%B')
+    month = when.strftime("%B")
     m2 = m + 1 if m < 12 else 1
     when2 = when.replace(day=1, month=m2)
-    month2 = when2.strftime('%B')
+    month2 = when2.strftime("%B")
     # days = (datetime.date(when.year, m, 1) - datetime.date(when.year, m, 1)).days
     # days = (date(2004, m2, 1) - date(2004, m, 1)).days
-    days = (when.replace(month=when.month % 12 + 1, day=1) - datetime.timedelta(days=1)).day
+    days = (
+        when.replace(month=when.month % 12 + 1, day=1) - datetime.timedelta(days=1)
+    ).day
     factor = d / days
 
     if texture is None:
-        texture = '{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png'
+        texture = "{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png"
 
-    if 'bluemarble' in texture:
+    if "bluemarble" in texture:
         # Check texture exists, if not download and process
         process_bluemarble(when, blendtex=blendtex)
 
-    for f in ['F', 'R', 'B', 'L', 'U', 'D']:
-        texfn = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month)
-        texfn2 = texture.format(basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month2)
-        assert (os.path.exists(texfn))
-        assert (os.path.exists(texfn2))
+    for f in ["F", "R", "B", "L", "U", "D"]:
+        texfn = texture.format(
+            basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month
+        )
+        texfn2 = texture.format(
+            basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month2
+        )
+        assert os.path.exists(texfn)
+        assert os.path.exists(texfn2)
         o = f + name
         if o in lv.objects:
             obj = lv.objects[o]
-            uniforms = obj['uniforms']
+            uniforms = obj["uniforms"]
 
             # if not 'blendTex' in uniforms or uniforms['blendTex'] != texfn2:
-            if obj['texture'] != texfn:
-                obj['texture'] = texfn  # Not needed, but set so can be checked above
+            if obj["texture"] != texfn:
+                obj["texture"] = texfn  # Not needed, but set so can be checked above
                 obj.texture(texfn, flip=False)
 
-            if blendtex and (not 'blendTex' in uniforms or uniforms['blendTex'] != texfn2):
-                uniforms['blendTex'] = texfn2
-                obj.texture(texfn2, flip=False, label='blendTex')
+            if blendtex and (
+                "blendTex" not in uniforms or uniforms["blendTex"] != texfn2
+            ):
+                uniforms["blendTex"] = texfn2
+                obj.texture(texfn2, flip=False, label="blendTex")
 
             if not blendtex:
                 factor = -1.0  # Disable blending multiple textures
             uniforms["blendFactor"] = factor
 
-            obj['uniforms'] = uniforms
+            obj["uniforms"] = uniforms
 
     lv.render()  # Required to render a frame which fixes texture glitch
     if sunlight:
         lv.set_properties(lightpos=sun_light(time=when))
 
 
-def update_earth_texture(lv, label, texture, flip=False, shared=True, name='', *args, **kwargs):
+def update_earth_texture(
+    lv, label, texture, flip=False, shared=True, name="", *args, **kwargs
+):
     # Update texture values for a specific texture on earth model
     if shared:
         # No need to update each object
         lv.texture(label, texture, flip)
-    for f in ['F', 'R', 'B', 'L', 'U', 'D']:
+    for f in ["F", "R", "B", "L", "U", "D"]:
         o = f + name
         if o in lv.objects:
             obj = lv.objects[o]
-            uniforms = obj['uniforms']
+            uniforms = obj["uniforms"]
             if not shared:
                 obj.texture(texture, flip=flip, label=label)
             else:
-                uniforms[label] = ''
+                uniforms[label] = ""
             uniforms.update(kwargs)
-            obj['uniforms'] = uniforms
+            obj["uniforms"] = uniforms
 
     lv.render()  # Required to render a frame which fixes texture glitch
 
 
-def update_earth_values(lv, name='', flip=False, *args, **kwargs):
+def update_earth_values(lv, name="", flip=False, *args, **kwargs):
     # Update uniform values on earth objects via passed kwargs
 
     # Replace texture data load shared texture afterwards
-    texture_arrays = {}
     for k in kwargs:
-        if isinstance(kwargs[k], (np.ndarray, np.generic)) or k == 'data':
+        if isinstance(kwargs[k], (np.ndarray, np.generic)) or k == "data":
             lv.texture(k, kwargs[k], flip=flip)
-            kwargs[k] = ''  # Requires a string value to trigger texture load
+            kwargs[k] = ""  # Requires a string value to trigger texture load
 
-    for f in ['F', 'R', 'B', 'L', 'U', 'D']:
+    for f in ["F", "R", "B", "L", "U", "D"]:
         o = f + name
         if o in lv.objects:
             obj = lv.objects[o]
-            uniforms = obj['uniforms']
+            uniforms = obj["uniforms"]
             uniforms.update(kwargs)
-            obj['uniforms'] = uniforms
+            obj["uniforms"] = uniforms
 
     lv.render()  # Required to render a frame which fixes texture glitch
 
@@ -986,13 +1104,13 @@ def vec_rotate(v, theta, axis):
         Angle in degrees
     axis : list/numpy.ndarray
         The 3 component axis of rotation
-        
+
     Returns
     -------
     numpy.ndarray: rotated 3d vector
     """
-    vector = np.array([0.] + v)
-    rot_axis = np.array([0.] + axis)
+    np.array([0.0] + v)
+    rot_axis = np.array([0.0] + axis)
     axis_angle = (theta * 0.5) * rot_axis / np.linalg.norm(rot_axis)
 
     vec = quat.quaternion(*v)
@@ -1008,13 +1126,15 @@ def vec_rotate(v, theta, axis):
 def magnitude(vec):
     return np.linalg.norm(vec)
 
+
 def normalise(vec):
     norm = np.linalg.norm(vec)
     if norm == 0:
-       vn = vec
+        vn = vec
     else:
         vn = vec / norm
     return vn
+
 
 def vector_align(v1, v2, lvformat=True):
     """
@@ -1032,28 +1152,29 @@ def vector_align(v1, v2, lvformat=True):
     list: quaternion to rotate v1 to v2 (in lavavu format)
     """
 
-    #Check for parallel or opposite
+    # Check for parallel or opposite
     v1 = normalise(np.array(v1))
     v2 = normalise(np.array(v2))
     epsilon = np.finfo(np.float32).eps
     one_minus_eps = 1.0 - epsilon
-    if np.dot(v1, v2) > one_minus_eps:    #  1.0
-        #No rotation
-        return [0,0,0,1]
-    elif np.dot(v1, v2) < -one_minus_eps: # -1.0
-        #180 rotation about Y
-        return [0,1,0,1]
+    if np.dot(v1, v2) > one_minus_eps:  #  1.0
+        # No rotation
+        return [0, 0, 0, 1]
+    elif np.dot(v1, v2) < -one_minus_eps:  # -1.0
+        # 180 rotation about Y
+        return [0, 1, 0, 1]
     xyz = np.cross(v1, v2)
     l1 = np.linalg.norm(v1)
     l2 = np.linalg.norm(v2)
-    w = math.sqrt((l1*l1) * (l2*l2)) + np.dot(v1, v2)
+    w = math.sqrt((l1 * l1) * (l2 * l2)) + np.dot(v1, v2)
     qr = quat.quaternion(w, xyz[0], xyz[1], xyz[2])
     qr = qr.normalized()
-    #Return in LavaVu quaternion format
+    # Return in LavaVu quaternion format
     if lvformat:
         return [qr.x, qr.y, qr.z, qr.w]
     else:
         return qr
+
 
 def lookat(lv, pos, lookat=None, up=None):
     """
@@ -1073,13 +1194,13 @@ def lookat(lv, pos, lookat=None, up=None):
 
     # Use the origin from viewer if no target provided
     if lookat is None:
-        lookat = lv['focus']
+        lookat = lv["focus"]
     else:
-        lv['focus'] = lookat
+        lv["focus"] = lookat
 
     # Default to Y-axis up vector
     if up is None:
-        up = np.array([0,1,0])
+        up = np.array([0, 1, 0])
 
     # Calculate the rotation matrix
     heading = np.array(pos) - np.array(lookat)
@@ -1089,7 +1210,7 @@ def lookat(lv, pos, lookat=None, up=None):
     q = quat.from_rotation_matrix(np.array([xd, yd, zd]))
     q = q.normalized()
 
-    #Apply the rotation
+    # Apply the rotation
     lv.rotation(q.x, q.y, q.z, q.w)
 
     # Translate back by heading vector length in Z
@@ -1099,7 +1220,16 @@ def lookat(lv, pos, lookat=None, up=None):
     # Apply translation
     lv.translation(tr)
 
-def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None, xyz=[0.4, 0.4, 1.0]):
+
+def sun_light(
+    time=None,
+    now=False,
+    local=True,
+    tz=None,
+    hour=None,
+    minute=None,
+    xyz=[0.4, 0.4, 1.0],
+):
     """
     Setup a sun light for earth model illumination
     Default with no parameters is a sun light roughly behind the camera that
@@ -1131,9 +1261,9 @@ def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None,
     xyz : list/ndarray
         When not using a time of day, this reference vector is used for a light that
         follows (sits behind) the camera, controlling the x,y,z components
-        of the final light position, will be normalised and then 
+        of the final light position, will be normalised and then
         multiplied by the earth to sun distance to get the position
-        
+
     Returns
     -------
     list: light position array to pass to lavavu, eg: lv["lightpos"] = sun_light(now=True)
@@ -1169,21 +1299,26 @@ def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None,
             if hour is not None:
                 time = time.replace(hour=hour)
                 # If only hour provided, always zero the minute
-                if minute is None: minute = 0
+                if minute is None:
+                    minute = 0
             if minute is not None:
                 time = time.replace(minute=minute)
 
             # Create astropy Time object
-            at = Time(time, scale='utc')
+            at = Time(time, scale="utc")
 
             # Get sun position in ECI / GCRS coords (earth centre of mass = origin)
-            sun_pos = astropy.coordinates.get_body('sun', at)
+            sun_pos = astropy.coordinates.get_body("sun", at)
             # Add location so we can get rotation angle
-            t = Time(time, location=('0d', '0d'))
+            t = Time(time, location=("0d", "0d"))
             a = t.earth_rotation_angle()
             # print(a.deg, a.rad)
 
-            S = (sun_pos.cartesian.x.to('Mm'), sun_pos.cartesian.y.to('Mm'), sun_pos.cartesian.z.to('Mm'))
+            S = (
+                sun_pos.cartesian.x.to("Mm"),
+                sun_pos.cartesian.y.to("Mm"),
+                sun_pos.cartesian.z.to("Mm"),
+            )
 
             # Swap x=y, y=z, z=x for our coord system
             S = (S[1].value, S[2].value, S[0].value)
@@ -1194,8 +1329,8 @@ def sun_light(time=None, now=False, local=True, tz=None, hour=None, minute=None,
             # Set 4th component to 1 to enable fixed light pos
             LP = [SR[0], SR[1], SR[2], 1]
 
-        except (ImportError) as e:
-            print('Sun/time lighting requires astropy, pip install astropy')
+        except (ImportError):
+            print("Sun/time lighting requires astropy, pip install astropy")
 
     return LP
 
@@ -1228,7 +1363,15 @@ def normalise_array(values, minimum=None, maximum=None):
     return array
 
 
-def array_to_rgba(values, colourmap='coolwarm', minimum=None, maximum=None, flip=False, opacity=0.0, opacitymap=False):
+def array_to_rgba(
+    values,
+    colourmap="coolwarm",
+    minimum=None,
+    maximum=None,
+    flip=False,
+    opacity=0.0,
+    opacitymap=False,
+):
     """
     Array to rgba texture using a matplotlib colourmap
 
@@ -1266,7 +1409,9 @@ def array_to_rgba(values, colourmap='coolwarm', minimum=None, maximum=None, flip
         if colours.max() > 1.0:
             # Assume range [0,255]
             colours = colours / 255.0
-        matplotlib.colors.LinearSegmentedColormap.from_list('custom', colours[::, 0:3])  # , N=len(colours))
+        matplotlib.colors.LinearSegmentedColormap.from_list(
+            "custom", colours[::, 0:3]
+        )  # , N=len(colours))
         mcm = matplotlib.pyplot.get_cmap(colourmap)
     else:
         mcm = colourmap
@@ -1331,10 +1476,10 @@ STEPS:
 
 """
 
-bm_tiles = ['A1', 'B1', 'C1', 'D1', 'A2', 'B2', 'C2', 'D2']
+bm_tiles = ["A1", "B1", "C1", "D1", "A2", "B2", "C2", "D2"]
 
 
-def load_mask(res_y=None, masktype='watermask', cropbox=None):
+def load_mask(res_y=None, masktype="watermask", cropbox=None):
     # TODO: Document args
     """
     Loads watermask/oceanmask
@@ -1351,35 +1496,48 @@ def load_mask(res_y=None, masktype='watermask', cropbox=None):
 
     masktype = 'oceanmask' / 'watermask'
     """
-    if res_y is None: res_y = settings.FULL_RES_Y
+    if res_y is None:
+        res_y = settings.FULL_RES_Y
     # Get the tiled high res images
-    os.makedirs(settings.DATA_PATH / 'landmask/source_tiled', exist_ok=True)
-    if len(glob.glob(f'{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz')) < 8:
-        import datetime
+    os.makedirs(settings.DATA_PATH / "landmask/source_tiled", exist_ok=True)
+    if (
+        len(
+            glob.glob(
+                f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
+            )
+        )
+        < 8
+    ):
         # Download tiles
         for t in bm_tiles:
             # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
-            url = f'https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz'
+            url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
             # print(url)
-            filename = download(url, f'{settings.DATA_PATH}/landmask/source_tiled')
+            download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
             # print(filename)
 
     # Calculate full image res to use for specified TEXRES
-    ffn = f'{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png'
+    ffn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
     if not os.path.exists(ffn):
         # Combine 4x2 image tiles into single image
         # [A1][B1][C1][D1]
         # [A2][B2][C2][D2]
         mask = np.zeros(shape=(43200, 86400), dtype=np.uint8)
         for t in bm_tiles:
-            x = (ord(t[0]) - ord('A'))
+            x = ord(t[0]) - ord("A")
             y = 1 if int(t[1]) == 2 else 0
-            paste_image(f'{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz', x, y,
-                        mask)
+            paste_image(
+                f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz",
+                x,
+                y,
+                mask,
+            )
 
         # Save full mask in various resolutions
         for res in [(86400, 43200), (43200, 21600), (21600, 10800)]:
-            r_fn = f'{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png'
+            r_fn = (
+                f"{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png"
+            )
             if not os.path.exists(r_fn):
                 # Create medium res mask image
                 mimg = Image.fromarray(mask)
@@ -1415,29 +1573,29 @@ def process_relief(overwrite=False, redownload=False):
     """
     # Check for processed imagery
     # print(midx,month_name,settings.TEXRES)
-    pdir = f'{settings.DATA_PATH}/relief/cubemap_{settings.TEXRES}'
+    pdir = f"{settings.DATA_PATH}/relief/cubemap_{settings.TEXRES}"
     os.makedirs(pdir, exist_ok=True)
-    cubemaps = len(glob.glob(f'{pdir}/*_relief_{settings.TEXRES}.png'))
+    cubemaps = len(glob.glob(f"{pdir}/*_relief_{settings.TEXRES}.png"))
     # print(cur_month, next_month)
     if not overwrite and cubemaps == 6:
         return  # Processed images present
 
     # Check for source images, download if not found
-    colour_tex = '4_no_ice_clouds_mts_16k.jpg'
-    sdir = f'{settings.DATA_PATH}/relief'
-    src = f'{sdir}/{colour_tex}'
+    colour_tex = "4_no_ice_clouds_mts_16k.jpg"
+    sdir = f"{settings.DATA_PATH}/relief"
+    src = f"{sdir}/{colour_tex}"
     if redownload or not os.path.exists(src):
-        print('Downloading missing source images...')
-        url = f'http://shadedrelief.com/natural3/ne3_data/16200/textures/{colour_tex}'
+        print("Downloading missing source images...")
+        url = f"http://shadedrelief.com/natural3/ne3_data/16200/textures/{colour_tex}"
         download(url, sdir, overwrite=redownload)
 
-    water_mask = 'water_16k.png'
-    if redownload or not os.path.exists(f'{sdir}/{water_mask}'):
-        url = f'http://shadedrelief.com/natural3/ne3_data/16200/masks/{water_mask}'
+    water_mask = "water_16k.png"
+    if redownload or not os.path.exists(f"{sdir}/{water_mask}"):
+        url = f"http://shadedrelief.com/natural3/ne3_data/16200/masks/{water_mask}"
         download(url, sdir, overwrite=redownload)
 
     # Land water mask for relief map
-    water = np.array(Image.open(f'{sdir}/{water_mask}'))
+    water = np.array(Image.open(f"{sdir}/{water_mask}"))
     # Renders a jpeg downsampled view
     water = water.reshape(water.shape[0], water.shape[1], 1)
 
@@ -1445,7 +1603,7 @@ def process_relief(overwrite=False, redownload=False):
     alphamask = 255 - water // 2
 
     # Open source image
-    col = np.array(Image.open(f'{sdir}/{colour_tex}'))
+    col = np.array(Image.open(f"{sdir}/{colour_tex}"))
 
     # Split the colour texture image into cube map tiles, including water mask
     # Export individial textures
@@ -1453,8 +1611,8 @@ def process_relief(overwrite=False, redownload=False):
         full = np.dstack((col, alphamask))
         textures = split_tex(full, settings.TEXRES)
         # Write colour texture tiles
-        for f in ['F', 'R', 'B', 'L', 'U', 'D']:
-            tfn = f'{f}_relief_{settings.TEXRES}.png'
+        for f in ["F", "R", "B", "L", "U", "D"]:
+            tfn = f"{f}_relief_{settings.TEXRES}.png"
             print(tfn)
             if overwrite or not os.path.exists(tfn):
                 # tex = lavavu.Image(data=textures[f])
@@ -1479,29 +1637,36 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         so need to check for both
     """
     midx = 0
-    month_name = ''
+    month_name = ""
     if when is not None:
         midx = when.month
         midx2 = midx + 1 if midx < 12 else 1
-        month_name = when.strftime('%B')
-        month_name2 = datetime.date(2004, midx2, 1).strftime('%B')
+        month_name = when.strftime("%B")
+        month_name2 = datetime.date(2004, midx2, 1).strftime("%B")
     # Check for processed imagery
     # print(midx,month_name,settings.TEXRES)
-    pdir = f'{settings.DATA_PATH}/bluemarble/cubemap_{settings.TEXRES}'
+    pdir = f"{settings.DATA_PATH}/bluemarble/cubemap_{settings.TEXRES}"
     os.makedirs(pdir, exist_ok=True)
-    cur_month = len(glob.glob(f'{pdir}/*_blue_marble_{month_name}_{settings.TEXRES}.png'))
-    next_month = len(glob.glob(f'{pdir}/*_blue_marble_{month_name2}_{settings.TEXRES}.png'))
+    cur_month = len(
+        glob.glob(f"{pdir}/*_blue_marble_{month_name}_{settings.TEXRES}.png")
+    )
+    next_month = len(
+        glob.glob(f"{pdir}/*_blue_marble_{month_name2}_{settings.TEXRES}.png")
+    )
     # print(cur_month, next_month)
     if not overwrite and cur_month == 6 and (not blendtex or next_month == 6):
         return  # Full month processed images present
-    if not overwrite and len(glob.glob(f'{pdir}/*_blue_marble_*_{settings.TEXRES}.png')) == 6 * 12:
+    if (
+        not overwrite
+        and len(glob.glob(f"{pdir}/*_blue_marble_*_{settings.TEXRES}.png")) == 6 * 12
+    ):
         return  # Full year processed images present
 
     # Check for source images, download if not found
-    sdir = f'{settings.DATA_PATH}/bluemarble/source_tiled'
+    sdir = f"{settings.DATA_PATH}/bluemarble/source_tiled"
     os.makedirs(sdir, exist_ok=True)
-    all_tiles = len(glob.glob(f'{sdir}/world.2004*.3x21600x21600.*.jpg'))
-    month_tiles = len(glob.glob(f'{sdir}/world.2004{midx}.3x21600x21600.*.jpg'))
+    all_tiles = len(glob.glob(f"{sdir}/world.2004*.3x21600x21600.*.jpg"))
+    month_tiles = len(glob.glob(f"{sdir}/world.2004{midx}.3x21600x21600.*.jpg"))
     months = range(1, 13)
     if midx > 0:
         # Get current and next month to allow blending
@@ -1510,24 +1675,28 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         else:
             months = [midx]
     if redownload or month_tiles < 8 and all_tiles < 8 * 12:
-        print('Downloading missing source images...')
-        os.makedirs(f'{settings.DATA_PATH}/bluemarble/source_full', exist_ok=True)
+        print("Downloading missing source images...")
+        os.makedirs(f"{settings.DATA_PATH}/bluemarble/source_full", exist_ok=True)
         # Still checks for existing files, but compares size with server copy, which takes time
         for m in months:
             dt = datetime.date(2004, m, 1)
-            month = dt.strftime('%B')
-            ym = dt.strftime('%Y%m')
+            month = dt.strftime("%B")
+            ym = dt.strftime("%Y%m")
             print(month)
             # 21600x10800 1/4 resolution single images (2km grid)
-            url = f'https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/world_2km/world.{ym}.3x21600x10800.jpg'
-            print(f' - {url}')
-            filename = download(url, f'{settings.DATA_PATH}/bluemarble/source_full', overwrite=redownload)
+            url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/world_2km/world.{ym}.3x21600x10800.jpg"
+            print(f" - {url}")
+            filename = download(
+                url,
+                f"{settings.DATA_PATH}/bluemarble/source_full",
+                overwrite=redownload,
+            )
 
             # Tiles are as above with .[ABCD][12].jpg (500m grid)
             # Download monthly tiles
             for t in bm_tiles:
                 # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
-                url = f'https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/world_500m/world.{ym}.3x21600x21600.{t}.jpg'
+                url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/world_500m/world.{ym}.3x21600x21600.{t}.jpg"
                 # https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/world_500m/world.200401.3x21600x21600.A1.jpg
                 print(url)
                 filename = download(url, sdir, overwrite=redownload)
@@ -1543,34 +1712,40 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
     full = np.zeros(shape=(43200, 86400, 3), dtype=np.uint8)
     for m in months:
         dt = datetime.date(2004, m, 1)
-        month = dt.strftime('%B')
+        month = dt.strftime("%B")
         print(f"Processing images for {month}...")
-        ym = dt.strftime('%Y%m')
+        ym = dt.strftime("%Y%m")
         if settings.TEXRES > 4096:
             # Combine 4x2 image tiles into single image
             # [A1][B1][C1][D1]
             # [A2][B2][C2][D2]
             for t in bm_tiles:
-                x = (ord(t[0]) - ord('A'))
+                x = ord(t[0]) - ord("A")
                 y = 1 if int(t[1]) == 2 else 0
-                paste_image(f'{sdir}/world.{ym}.3x21600x21600.{t}.jpg', x, y, full)
+                paste_image(f"{sdir}/world.{ym}.3x21600x21600.{t}.jpg", x, y, full)
         else:
             # Medium resolution, full image is detailed enough for 4096^2 textures and below
-            img = Image.open(f'{settings.DATA_PATH}/bluemarble/source_full/world.{ym}.3x21600x10800.jpg')
+            img = Image.open(
+                f"{settings.DATA_PATH}/bluemarble/source_full/world.{ym}.3x21600x10800.jpg"
+            )
             full = np.array(img)
 
         # Set ocean to semi-transparent
         full4 = np.dstack((full, alphamask))
 
         # Export individial textures
-        if overwrite or len(glob.glob(f'{pdir}/*_blue_marble_{month}_{settings.TEXRES}.png')) != 6:
+        if (
+            overwrite
+            or len(glob.glob(f"{pdir}/*_blue_marble_{month}_{settings.TEXRES}.png"))
+            != 6
+        ):
             with closing(pushd(pdir)):
-                print(' - Splitting')
+                print(" - Splitting")
                 textures = split_tex(full4, settings.TEXRES)
                 # Write colour texture tiles
-                for f in ['F', 'R', 'B', 'L', 'U', 'D']:
-                    tfn = f'{f}_blue_marble_{month}_{settings.TEXRES}.png'
-                    print(' - ', tfn)
+                for f in ["F", "R", "B", "L", "U", "D"]:
+                    tfn = f"{f}_blue_marble_{month}_{settings.TEXRES}.png"
+                    print(" - ", tfn)
                     if overwrite or not os.path.exists(tfn):
                         tex = lavavu.Image(data=textures[f])
                         tex.save(tfn)
@@ -1589,25 +1764,29 @@ def process_gebco(overwrite=False, redownload=False):
     - NC version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/
     - Sub-ice topo version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2023_sub_ice_topo/zip/
     """
-    subsampled = len(glob.glob(f'{settings.DATA_PATH}/gebco/gebco_equirectangular_*_x_*'))
-    cubemap = len(glob.glob(f'{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}.npz'))
+    subsampled = len(
+        glob.glob(f"{settings.DATA_PATH}/gebco/gebco_equirectangular_*_x_*")
+    )
+    cubemap = len(
+        glob.glob(f"{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}.npz")
+    )
     if not overwrite and subsampled == 2 and cubemap == 1:
         return  # Processed data exists
 
-    '''
+    """
     #Download from github releases
     #TODO: create release and upload these files
     #TODO2: move subsampling and export functions from GEBCO.ipynb to this module
     url = f"https://github.com/ACCESS-NRI/visualisations/releases/download/v0.0.1/gebco_cubemap_{settings.GRIDRES}.npz"
     raise(Exception("TODO: upload gebco cubemap data to github releases!"))
     filename = utils.download(url, './data/gebco')
-    '''
+    """
 
     # Attempt to load full GEBCO
     if not os.path.exists(settings.GEBCO_PATH):
-        print(f'Please update the path to GEBCO_2020.nc for {settings.GEBCO_PATH=}')
-        print('https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/')
-        raise (FileNotFoundError('Missing GEBCO path/file'))
+        print(f"Please update the path to GEBCO_2020.nc for {settings.GEBCO_PATH=}")
+        print("https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/")
+        raise (FileNotFoundError("Missing GEBCO path/file"))
 
     ds = xr.open_dataset(settings.GEBCO_PATH)
 
@@ -1615,11 +1794,11 @@ def process_gebco(overwrite=False, redownload=False):
     # (keep in lat/lon)
     # Export subsampled equirectangular data for regional clipping at lower res
     def export_subsampled(ss):
-        os.makedirs(settings.DATA_PATH / 'gebco', exist_ok=True)
-        fn = f'{settings.DATA_PATH}/gebco/gebco_equirectangular_{86400 // ss}_x_{43200 // ss}'
+        os.makedirs(settings.DATA_PATH / "gebco", exist_ok=True)
+        fn = f"{settings.DATA_PATH}/gebco/gebco_equirectangular_{86400 // ss}_x_{43200 // ss}"
         print(fn)
-        if overwrite or not os.path.exists(fn + '.npz'):
-            height_ss = ds['elevation'][::ss, ::ss].to_numpy()
+        if overwrite or not os.path.exists(fn + ".npz"):
+            height_ss = ds["elevation"][::ss, ::ss].to_numpy()
             height_ss = np.flipud(height_ss)
             np.savez_compressed(fn, elevation=height_ss)
 
@@ -1628,8 +1807,8 @@ def process_gebco(overwrite=False, redownload=False):
 
     # Cubemap (units = Mm)
     # Subsample to a reasonable resolution for our grid resolution
-    SS = ds['elevation'].shape[0] // (settings.GRIDRES * 2) - 1
-    height = ds['elevation'][::SS, ::SS].to_numpy()
+    SS = ds["elevation"].shape[0] // (settings.GRIDRES * 2) - 1
+    height = ds["elevation"][::SS, ::SS].to_numpy()
     height = np.flipud(height)
 
     # Convert from M to Mm
@@ -1637,9 +1816,9 @@ def process_gebco(overwrite=False, redownload=False):
 
     # Split the equirectangular array into cube map tiles
     # (cache/load to save time)
-    fn = f'{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}'
-    if os.path.exists(fn + '.npz'):
-        heights = np.load(fn + '.npz')
+    fn = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}"
+    if os.path.exists(fn + ".npz"):
+        heights = np.load(fn + ".npz")
     else:
         heights = split_tex(height, settings.GRIDRES)
         np.savez_compressed(fn, **heights)

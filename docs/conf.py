@@ -16,10 +16,10 @@
 
 
 # -- Project information -----------------------------------------------------
-project = 'ACCESS-Vis'
-copyright = '2024, Owen Kaluza'
-author = 'Owen Kaluza'
-release = 'v0.1'
+project = "ACCESS-Vis"
+copyright = "2024, Owen Kaluza"
+author = "Owen Kaluza"
+release = "v0.1"
 
 # -- General configuration ---------------------------------------------------
 
