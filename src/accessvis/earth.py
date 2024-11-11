@@ -16,7 +16,7 @@ import py360convert
 import quaternion as quat
 import xarray as xr
 from PIL import Image
-from utils import download, is_notebook, pushd
+from .utils import download, is_notebook, pushd
 
 Image.MAX_IMAGE_PIXELS = None
 
