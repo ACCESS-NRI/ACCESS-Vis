@@ -1426,17 +1426,19 @@ def array_to_rgba(
         if opacity <= 1.0:
             opacity = int(255 * opacity)
         rgba[::, ::, 3] = opacity
+    elif opacitymap is True: # ndarrays are incompatible with bool().
+        oarray = (array * 255).round().astype(np.uint8)
+        rgba[::, ::, 3] = oarray
+    elif hasattr(opacitymap, '__array__'): # numpy compatible object
+        oarray = normalise_array(opacitymap)
+        if flip:
+            oarray = np.flipud(np.array(oarray))
+        if oarray.max() <= 1.0:
+            oarray = (oarray * 255).round().astype(np.uint8)
+        rgba[::, ::, 3] = oarray
     elif opacitymap:
-        if isinstance(opacitymap, bool):
-            oarray = (array * 255).round().astype(np.uint8)
-            rgba[::, ::, 3] = oarray
-        else:
-            oarray = normalise_array(opacitymap)
-            if flip:
-                oarray = np.flipud(np.array(oarray))
-            if oarray.max() <= 1.0:
-                oarray = (oarray * 255).round().astype(np.uint8)
-            rgba[::, ::, 3] = oarray
+        raise TypeError('Unknown opacitymap type: Expected bool or ndarray')
+
     return rgba
 
 
