@@ -1,9 +1,10 @@
 channels:
   - conda-forge
   - accessnri
-  - default
+  - nodefaults 
 
 dependencies:
   - anaconda-client
   - conda-build
   - conda-verify
+  - versioneer
