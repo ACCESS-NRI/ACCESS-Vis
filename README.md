@@ -1,5 +1,7 @@
 # ACCESS-Vis Python Visualisation Package for ACCESS Models.
 
+[![DOI](https://zenodo.org/badge/767301983.svg)](https://doi.org/10.5281/zenodo.14167608)
+
 [![Documentation Status](https://readthedocs.org/projects/access-vis/badge/?version=latest)](https://access-vis.readthedocs.io/en/latest/?badge=latest)
 
 Visualisation examples and resources, including open-source 3D vis for ACCESS-NRI releases
