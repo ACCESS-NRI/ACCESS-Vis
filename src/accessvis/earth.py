@@ -16,6 +16,7 @@ import py360convert
 import quaternion as quat
 import xarray as xr
 from PIL import Image
+
 from .utils import download, is_notebook, pushd
 
 Image.MAX_IMAGE_PIXELS = None
@@ -1426,10 +1427,10 @@ def array_to_rgba(
         if opacity <= 1.0:
             opacity = int(255 * opacity)
         rgba[::, ::, 3] = opacity
-    elif opacitymap is True: # ndarrays are incompatible with bool().
+    elif opacitymap is True:  # ndarrays are incompatible with bool().
         oarray = (array * 255).round().astype(np.uint8)
         rgba[::, ::, 3] = oarray
-    elif hasattr(opacitymap, '__array__'): # numpy compatible object
+    elif hasattr(opacitymap, "__array__"):  # numpy compatible object
         oarray = normalise_array(opacitymap)
         if flip:
             oarray = np.flipud(np.array(oarray))
@@ -1437,7 +1438,7 @@ def array_to_rgba(
             oarray = (oarray * 255).round().astype(np.uint8)
         rgba[::, ::, 3] = oarray
     elif opacitymap:
-        raise TypeError('Unknown opacitymap type: Expected bool or ndarray')
+        raise TypeError("Unknown opacitymap type: Expected bool or ndarray")
 
     return rgba
 
