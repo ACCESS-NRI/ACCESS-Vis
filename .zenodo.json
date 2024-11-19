@@ -20,6 +20,9 @@
 
     "title": "ACCESS-NRI ACCESS-Vis Python Package",
 
-    "keywords": ["Climate", "Science", "Model Evaluation", "Visualisation", "ACCESS-NRI"]
+    "keywords": ["Climate", "Science", "Model Evaluation", "Visualisation", "ACCESS-NRI"],
 
+    "communities": [
+        {"identifier": "access-nri"}
+    ]
 }
