@@ -95,6 +95,7 @@ def get_viewer(*args, **kwargs):
             metadata.metadata("lavavu")
             # Requires moderngl for EGL headless context
             import moderngl
+
             print(
                 moderngl.__file__
             )  # If we don't use it the pre-commit will delete above
@@ -1512,7 +1513,6 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
             url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
             # print(url)
             download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
-
 
     # Calculate full image res to use for specified TEXRES
     ffn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
