@@ -87,19 +87,16 @@ def get_viewer(*args, **kwargs):
     return: lavavu.Viewer
     """
     if settings.HEADLESS:
-        from importlib import metadata
+        from importlib import metadata, util
 
         try:
             # If this fails, lavavu-osmesa was installed
-            # headless not required because always in headless mode
+            # headless setting not required as implicitly in headless mode
             metadata.metadata("lavavu")
-            # Requires moderngl for EGL headless context
-            import moderngl
+            # Also requires moderngl for EGL headless context
+            settings.HEADLESS = util.find_spec("moderngl") is not None
 
-            print(
-                moderngl.__file__
-            )  # If we don't use it the pre-commit will delete above
-        except (ImportError, metadata.PackageNotFoundError):
+        except (metadata.PackageNotFoundError):
             settings.HEADLESS = False
 
     if settings.HEADLESS:
@@ -656,14 +653,25 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
         heights = crop_img_lat_lon(heights, cropbox)
 
     # Bathymetry?
-    if not bathymetry:
+    if not bathymetry or not isinstance(bathymetry, bool):
         # Ensure resolution matches topo grid res
         # res_y = resolution//4096 * 10800
         # res_y = max(resolution,2048) // 2048 * 10800
-        mask = load_mask(res_y=resolution, cropbox=cropbox, masktype="oceanmask")
+        mask = load_mask(
+            res_y=resolution, subsample=subsample, cropbox=cropbox, masktype="oceanmask"
+        )
         # print(type(mask), mask.dtype, mask.min(), mask.max())
-        # Use the mask to zero the bathymetry
-        heights[mask < 255] = 0
+        if bathymetry == "mask":
+            # Return a masked array
+            return np.ma.array(heights, mask=(mask < 255), fill_value=0)
+        elif not isinstance(bathymetry, bool):
+            # Can pass a fill value, needs to return as floats instead of int though
+            ma = np.ma.array(heights.astype(float), mask=(mask < 255))
+            return ma.filled(bathymetry)
+        else:
+            # Zero out to sea level
+            # Use the mask to zero the bathymetry
+            heights[mask < 255] = 0
 
     return heights  # * vertical_exaggeration
 
@@ -961,6 +969,9 @@ def plot_earth(
         elif lr == "l":
             el[::, ::, idx] = col * 0.5
         obj.texcoords(el)
+
+    if hemisphere is not None:
+        lv.render()  # Display/update
 
     if hemisphere == "N":
         for f in ["F", "R", "B", "L"]:
@@ -1484,7 +1495,7 @@ STEPS:
 bm_tiles = ["A1", "B1", "C1", "D1", "A2", "B2", "C2", "D2"]
 
 
-def load_mask(res_y=None, masktype="watermask", cropbox=None):
+def load_mask(res_y=None, masktype="watermask", subsample=1, cropbox=None):
     # TODO: Document args
     """
     Loads watermask/oceanmask
@@ -1551,6 +1562,8 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
         image = Image.open(ffn)
         mask = np.array(image)
 
+    if subsample > 1:
+        mask = mask[::subsample, ::subsample]
     if cropbox:
         return crop_img_lat_lon(mask, cropbox)
     return mask
