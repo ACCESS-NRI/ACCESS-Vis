@@ -973,6 +973,9 @@ def plot_earth(
             el[::, ::, idx] = col * 0.5
         obj.texcoords(el)
 
+    if hemisphere is not None:
+        lv.render()  # Display/update
+
     if hemisphere == "N":
         for f in ["F", "R", "B", "L"]:
             replace_texcoords(f, 1, "r")
