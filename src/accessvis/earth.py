@@ -1531,9 +1531,7 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
 
         # Save full mask in various resolutions
         for res in [(86400, 43200), (43200, 21600), (21600, 10800)]:
-            r_fn = (
-                f"{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png"
-            )
+            r_fn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png"
             if not os.path.exists(r_fn):
                 # Create medium res mask image
                 mimg = Image.fromarray(mask)
