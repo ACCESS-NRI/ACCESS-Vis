@@ -660,17 +660,19 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
         # Ensure resolution matches topo grid res
         # res_y = resolution//4096 * 10800
         # res_y = max(resolution,2048) // 2048 * 10800
-        mask = load_mask(res_y=resolution, subsample=subsample, cropbox=cropbox, masktype="oceanmask")
+        mask = load_mask(
+            res_y=resolution, subsample=subsample, cropbox=cropbox, masktype="oceanmask"
+        )
         # print(type(mask), mask.dtype, mask.min(), mask.max())
         if bathymetry == "mask":
-            #Return a masked array
+            # Return a masked array
             return np.ma.array(heights, mask=(mask < 255), fill_value=0)
         elif not isinstance(bathymetry, bool):
-            #Can pass a fill value, needs to return as floats instead of int though
+            # Can pass a fill value, needs to return as floats instead of int though
             ma = np.ma.array(heights.astype(float), mask=(mask < 255))
             return ma.filled(bathymetry)
         else:
-            #Zero out to sea level
+            # Zero out to sea level
             # Use the mask to zero the bathymetry
             heights[mask < 255] = 0
 
