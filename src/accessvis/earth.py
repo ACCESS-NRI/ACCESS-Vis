@@ -660,7 +660,7 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
         # Ensure resolution matches topo grid res
         # res_y = resolution//4096 * 10800
         # res_y = max(resolution,2048) // 2048 * 10800
-        mask = load_mask(res_y=resolution, cropbox=cropbox, masktype="oceanmask")
+        mask = load_mask(res_y=resolution, subsample=subsample, cropbox=cropbox, masktype="oceanmask")
         # print(type(mask), mask.dtype, mask.min(), mask.max())
         if bathymetry == "mask":
             #Return a masked array
@@ -1493,7 +1493,7 @@ STEPS:
 bm_tiles = ["A1", "B1", "C1", "D1", "A2", "B2", "C2", "D2"]
 
 
-def load_mask(res_y=None, masktype="watermask", cropbox=None):
+def load_mask(res_y=None, masktype="watermask", subsample=1, cropbox=None):
     # TODO: Document args
     """
     Loads watermask/oceanmask
@@ -1560,6 +1560,8 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
         image = Image.open(ffn)
         mask = np.array(image)
 
+    if subsample > 1:
+        mask = mask[::subsample, ::subsample]
     if cropbox:
         return crop_img_lat_lon(mask, cropbox)
     return mask
