@@ -94,6 +94,8 @@ def get_viewer(*args, **kwargs):
             # headless not required because always in headless mode
             metadata.metadata("lavavu")
             # Requires moderngl for EGL headless context
+            import moderngl
+            print(moderngl.__file__) #If we don't use it the pre-commit will delete above
         except (ImportError, metadata.PackageNotFoundError):
             settings.HEADLESS = False
 
