@@ -1502,14 +1502,8 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
         res_y = settings.FULL_RES_Y
     # Get the tiled high res images
     os.makedirs(settings.DATA_PATH / "landmask/source_tiled", exist_ok=True)
-    if (
-        len(
-            glob.glob(
-                f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
-            )
-        )
-        < 8
-    ):
+    filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
+    if len(glob.glob(filespec)) < 8:
         # Download tiles
         for t in bm_tiles:
             # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
