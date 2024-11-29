@@ -1522,12 +1522,8 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
         for t in bm_tiles:
             x = ord(t[0]) - ord("A")
             y = 1 if int(t[1]) == 2 else 0
-            paste_image(
-                f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz",
-                x,
-                y,
-                mask,
-            )
+            filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
+            paste_image(filespec, x, y, mask)
 
         # Save full mask in various resolutions
         for res in [(86400, 43200), (43200, 21600), (21600, 10800)]:
