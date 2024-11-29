@@ -87,19 +87,16 @@ def get_viewer(*args, **kwargs):
     return: lavavu.Viewer
     """
     if settings.HEADLESS:
-        from importlib import metadata
+        from importlib import metadata, util
 
         try:
             # If this fails, lavavu-osmesa was installed
-            # headless not required because always in headless mode
+            # headless setting not required as implicitly in headless mode
             metadata.metadata("lavavu")
-            # Requires moderngl for EGL headless context
-            import moderngl
+            # Also requires moderngl for EGL headless context
+            settings.HEADLESS = util.find_spec("moderngl") is not None
 
-            print(
-                moderngl.__file__
-            )  # If we don't use it the pre-commit will delete above
-        except (ImportError, metadata.PackageNotFoundError):
+        except (metadata.PackageNotFoundError):
             settings.HEADLESS = False
 
     if settings.HEADLESS:
