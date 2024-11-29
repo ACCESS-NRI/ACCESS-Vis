@@ -51,7 +51,7 @@ class Settings:
     if envdir:
         DATA_PATH = Path(envdir)
     else:
-        # Check if running on 'gadi.nci.org.au'
+        # Check if running on "gadi.nci.org.au"
         if gadi:
             # Use public shared data cache on gadi
             DATA_PATH = Path("/g/data/xp65/public/apps/access-vis-data")
@@ -216,7 +216,7 @@ def paste_image(fn, xpos, ypos, out):
     # print(fn, col.shape)
     xoff = xpos * col.shape[0]
     yoff = ypos * col.shape[1]
-    # print(f'{yoff}:{yoff+col.shape[1]}, {xoff}:{xoff+col.shape[0]}')
+    # print(f"{yoff}:{yoff+col.shape[1]}, {xoff}:{xoff+col.shape[0]}")
     out[yoff : yoff + col.shape[1], xoff : xoff + col.shape[0]] = col
 
 
@@ -473,12 +473,12 @@ def cubemap_sphere_vertices(
         and save the data for next time
     hemisphere: str
         Crop the data to show a single hemisphere
-        'N' = North polar
-        'S' = South polar
-        'EW' = Antimeridian at centre (Oceania/Pacific)
-        'WE' = Prime meridian at centre (Africa/Europe)
-        'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
-        'W' = Western hemisphere - antimeridian to prime meridian (Americas)
+        "N" = North polar
+        "S" = South polar
+        "EW" = Antimeridian at centre (Oceania/Pacific)
+        "WE" = Prime meridian at centre (Africa/Europe)
+        "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
+        "W" = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     if resolution is None:
         resolution = settings.GRIDRES
@@ -592,12 +592,12 @@ def load_topography_cubemap(
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
     hemisphere: str
         Crop the data to show a single hemisphere
-        'N' = North polar
-        'S' = South polar
-        'EW' = Antimeridian at centre (Oceania/Pacific)
-        'WE' = Prime meridian at centre (Africa/Europe)
-        'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
-        'W' = Western hemisphere - antimeridian to prime meridian (Americas)
+        "N" = North polar
+        "S" = South polar
+        "EW" = Antimeridian at centre (Oceania/Pacific)
+        "WE" = Prime meridian at centre (Africa/Europe)
+        "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
+        "W" = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     # Load detailed topo data
     if resolution is None:
@@ -717,7 +717,7 @@ def plot_region(
         uniforms["waves"] = True
 
     if shaders is None:
-        shaders = [f'{settings.INSTALL_PATH}/data/earth_shader.vert', f'{settings.INSTALL_PATH}/data/earth_shader.frag']
+        shaders = [f"{settings.INSTALL_PATH}/data/earth_shader.vert", f"{settings.INSTALL_PATH}/data/earth_shader.frag"]
     """
 
     # Split kwargs into global props, object props and uniform values
@@ -750,9 +750,9 @@ def plot_region(
         # TODO: support cropping tiled high res blue marble textures
         # Also download relief textures if not found or call process_bluemarble
         # TODO2: write a process_relief function for splitting/downloading relief from Earth_Model.ipynb
-        # colour_tex = f'{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg'
+        # colour_tex = f"{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg"
         colour_tex = f"{settings.DATA_PATH}/bluemarble/source_full/world.200412.3x21600x10800.jpg"
-        # colour_tex = f'{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png'
+        # colour_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
         uniforms["bluemarble"] = True
     elif texture == "relief":
         colour_tex = f"{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg"
@@ -801,15 +801,15 @@ def plot_earth(
     ----------
     texture: str
         Path to textures, face label and texres will be applied with .format(), eg:
-        texture='path/{face}_mytexture_{texres}.png'
-        with: texture.format(face='F', texres=settings.TEXRES)
-        to:'path/F_mytexture_1024.png'
+        texture="path/{face}_mytexture_{texres}.png"
+        with: texture.format(face="F", texres=settings.TEXRES)
+        to:"path/F_mytexture_1024.png"
     radius: float
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
     vertical_exaggeration: number
         Multiplier to topography/bathymetry height
     texture: str
-        Texture set to use, 'bluemarble' for the 2004 NASA satellite data, 'relief' for a basic relief map
+        Texture set to use, "bluemarble" for the 2004 NASA satellite data, "relief" for a basic relief map
         or provide a custom set of textures using a filename template with the following variables, only face is required
         {face} (F/R/B/L/U/D) {month} (name of month, capitialised) {texres} (2048/4096/8192/16384)
     lighting: bool
@@ -818,9 +818,9 @@ def plot_earth(
         Provide a datetime object to set the month for texture sets that vary over the year and time for
         position of sun and rotation of earth when calculating sun light position
     hour: int
-        If not providing 'when' datetime, provide just the hour and minute
+        If not providing "when" datetime, provide just the hour and minute
     minute: int
-        If not providing 'when' datetime, provide just the hour and minute
+        If not providing "when" datetime, provide just the hour and minute
     waves: bool
         When plotting ocean as surface, set this to true to render waves
     sunlight: bool
@@ -834,17 +834,17 @@ def plot_earth(
     uniforms: dict
         Provide a set of uniform variables, these can be used to pass data to a custom shader
     shaders: list
-        Provide a list of two custom shader file paths eg: ['vertex_shader.glsl', 'fragment_shader.glsl']
+        Provide a list of two custom shader file paths eg: ["vertex_shader.glsl", "fragment_shader.glsl"]
     background: str
         Provide a background colour string, X11 colour name or hex RGB
     hemisphere: str
         Crop the data to show a single hemisphere
-        'N' = North polar
-        'S' = South polar
-        'EW' = Antimeridian at centre (Oceania/Pacific)
-        'WE' = Prime meridian at centre (Africa/Europe)
-        'E' = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
-        'W' = Western hemisphere - antimeridian to prime meridian (Americas)
+        "N" = North polar
+        "S" = South polar
+        "EW" = Antimeridian at centre (Oceania/Pacific)
+        "WE" = Prime meridian at centre (Africa/Europe)
+        "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
+        "W" = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     if lv is None:
         lv = get_viewer(
@@ -1027,7 +1027,7 @@ def update_earth_datetime(
             obj = lv.objects[o]
             uniforms = obj["uniforms"]
 
-            # if not 'blendTex' in uniforms or uniforms['blendTex'] != texfn2:
+            # if not "blendTex" in uniforms or uniforms["blendTex"] != texfn2:
             if obj["texture"] != texfn:
                 obj["texture"] = texfn  # Not needed, but set so can be checked above
                 obj.texture(texfn, flip=False)
@@ -1090,8 +1090,6 @@ def update_earth_values(lv, name="", flip=False, *args, **kwargs):
 
     lv.render()  # Required to render a frame which fixes texture glitch
 
-    # Load the texture arrays
-
 
 def vec_rotate(v, theta, axis):
     """
@@ -1110,7 +1108,6 @@ def vec_rotate(v, theta, axis):
     -------
     numpy.ndarray: rotated 3d vector
     """
-    np.array([0.0] + v)
     rot_axis = np.array([0.0] + axis)
     axis_angle = (theta * 0.5) * rot_axis / np.linalg.norm(rot_axis)
 
@@ -1497,7 +1494,7 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
     https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/
     https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask/world.watermask.21600x21600.A1.png
 
-    masktype = 'oceanmask' / 'watermask'
+    masktype = "oceanmask" / "watermask"
     """
     if res_y is None:
         res_y = settings.FULL_RES_Y
@@ -1517,7 +1514,7 @@ def load_mask(res_y=None, masktype="watermask", cropbox=None):
             url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
             # print(url)
             download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
-            # print(filename)
+
 
     # Calculate full image res to use for specified TEXRES
     ffn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
@@ -1782,7 +1779,7 @@ def process_gebco(overwrite=False, redownload=False):
     #TODO2: move subsampling and export functions from GEBCO.ipynb to this module
     url = f"https://github.com/ACCESS-NRI/visualisations/releases/download/v0.0.1/gebco_cubemap_{settings.GRIDRES}.npz"
     raise(Exception("TODO: upload gebco cubemap data to github releases!"))
-    filename = utils.download(url, './data/gebco')
+    filename = utils.download(url, "./data/gebco")
     """
 
     # Attempt to load full GEBCO
