@@ -35,14 +35,15 @@ class ClockWidget(WidgetMPL):
         return fig, ax
 
     def _update_mpl(self, fig, ax, time: datetime.time = None, **kwargs):
+        if time is None:
+            return
+
         hour = time.hour
         minute = time.minute
         second = time.second
         angles_h = 2 * np.pi * hour / 12 + 2 * np.pi * minute / (12 * 60) + 2 * second / (12 * 60 * 60) - np.pi / 6.0
         angles_m = 2 * np.pi * minute / 60 + 2 * np.pi * second / (60 * 60) - np.pi / 6.0
         angles_s = 2 * np.pi * second / 60 - np.pi / 6.0
-        if time is None:
-            return
 
         if self.show_seconds:
             lines = ax.plot([angles_s, angles_s], [0, 0.9], color=self.text_colour, linewidth=1)
