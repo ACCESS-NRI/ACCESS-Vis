@@ -45,7 +45,7 @@ class CalendarWidget(WidgetMPL):
 
 
     def _update_mpl(self, fig, ax, date: datetime.datetime = None, show_year=True):
-        if show_year:
+        if show_year and date is not None:
             title = str(date.year)
         else:
             title = ''
