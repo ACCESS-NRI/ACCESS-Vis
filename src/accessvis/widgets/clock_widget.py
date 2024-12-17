@@ -5,7 +5,7 @@ import numpy as np
 
 
 class ClockWidget(WidgetMPL):
-    def __init__(self, lv, text_colour='black', background='white',
+    def __init__(self, lv, text_colour='white', background='black',
                  show_seconds=False, show_minutes=True, show_hours=True, **kwargs):
         super().__init__(lv=lv, **kwargs)
         self.text_colour = text_colour
