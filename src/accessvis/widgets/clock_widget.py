@@ -18,7 +18,7 @@ class ClockWidget(WidgetMPL):
     # based on https://inprogrammer.com/analog-clock-python/
     def _make_mpl(self):
         fig = plt.figure(figsize=(2.5, 2.5), dpi=100)
-        fig.patch.set_facecolor((0, 0, 0, 0))  # make background transparrent
+        fig.patch.set_facecolor((0, 0, 0, 0))  # make background transparent
         ax = fig.add_subplot(111, polar=True)
         plt.setp(ax.get_yticklabels(), visible=False)
         ax.set_xticks(np.linspace(0, 2 * np.pi, 12, endpoint=False))

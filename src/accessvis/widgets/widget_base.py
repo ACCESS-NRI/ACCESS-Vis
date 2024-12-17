@@ -32,7 +32,7 @@ class Widget(ABC):
     def _make_pixels(self, **kwargs):
         pass
 
-    def add_widget(self, **kwargs):
+    def update_widget(self, **kwargs):
         if self.overlay is None:
             self.make_overlay()
 
@@ -69,17 +69,28 @@ class WidgetMPL(Widget):
     def _cache_mpl(self):  # only create base MPL once.
         return self._make_mpl()
 
-    def _make_pixels(self, **kwargs):
-        fig, ax = self._cache_mpl
-        self._update_mpl(fig=fig, ax=ax, **kwargs)
+    @property
+    def fig(self):
+        return self._cache_mpl[0]
 
-        canvas = fig.canvas
+    @property
+    def ax(self):
+        return self._cache_mpl[1]
+
+    def _make_pixels(self, **kwargs):
+        self._update_mpl(fig=self.fig, ax=self.ax, **kwargs)
+
+        canvas = self.fig.canvas
         canvas.draw()
         pixels = np.asarray(canvas.buffer_rgba())
 
-        self._reset_mpl(fig=fig, ax=ax, **kwargs)
+        self._reset_mpl(fig=self.fig, ax=self.ax, **kwargs)
 
         return pixels
+
+    def show_mpl(self, **kwargs):
+        self._update_mpl(fig=self.fig, ax=self.ax, **kwargs)
+        self._reset_mpl(fig=self.fig, ax=self.ax, **kwargs)
 
 
 def list_widgets():
