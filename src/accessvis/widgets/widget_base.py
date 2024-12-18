@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 from ..earth import Settings
 
@@ -22,12 +22,12 @@ class Widget(ABC):
         pixels[::, ::, ::] = 0
         y, x, c = np.shape(pixels)
 
-        vert_path = os.path.join(Settings.INSTALL_PATH, 'widgets', 'screen.vert')
-        frag_path = os.path.join(Settings.INSTALL_PATH, 'widgets', 'screen.frag')
+        vert_path = os.path.join(Settings.INSTALL_PATH, "widgets", "screen.vert")
+        frag_path = os.path.join(Settings.INSTALL_PATH, "widgets", "screen.frag")
 
         self.overlay = self.lv.screen(shaders=[vert_path, frag_path], vertices=[[0, 0, 0]], texture="blank.png")
 
-        self.lv.set_uniforms(self.overlay['name'], scale=self.scale, offset=self.offset, widthToHeight=x / y)
+        self.lv.set_uniforms(self.overlay["name"], scale=self.scale, offset=self.offset, widthToHeight=x / y)
         self.overlay.texture(pixels)  # Clear texture with transparent image
 
     @abstractmethod
@@ -43,7 +43,7 @@ class Widget(ABC):
 
     def remove(self):
         if self.overlay is not None:
-            self.lv.delete(self.overlay['name'])
+            self.lv.delete(self.overlay["name"])
             self.overlay = None
             self.lv = None
 

@@ -1,11 +1,13 @@
 import datetime
-from .widget_base import WidgetMPL
+
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .widget_base import WidgetMPL
+
 
 class ClockWidget(WidgetMPL):
-    def __init__(self, lv, text_colour='white', background='black',
+    def __init__(self, lv, text_colour="white", background="black",
                  show_seconds=False, show_minutes=True, show_hours=True, **kwargs):
         super().__init__(lv=lv, **kwargs)
         self.text_colour = text_colour
@@ -23,14 +25,14 @@ class ClockWidget(WidgetMPL):
         plt.setp(ax.get_yticklabels(), visible=False)
         ax.set_xticks(np.linspace(0, 2 * np.pi, 12, endpoint=False))
         ax.set_xticklabels(range(1, 13))
-        ax.tick_params(axis='x', which='major', labelcolor=self.text_colour)
+        ax.tick_params(axis="x", which="major", labelcolor=self.text_colour)
         ax.set_theta_direction(-1)
         ax.set_theta_offset(np.pi / 3.0)
         ax.grid(False)
         plt.ylim(0, 1)
 
         ax.set_facecolor(self.background)
-        ax.spines['polar'].set_color(self.text_colour)
+        ax.spines["polar"].set_color(self.text_colour)
 
         return fig, ax
 
