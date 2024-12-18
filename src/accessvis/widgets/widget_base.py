@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
+
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 
@@ -48,7 +50,7 @@ class Widget(ABC):
 
 class WidgetMPL(Widget):
     @abstractmethod
-    def _make_mpl(self):
+    def _make_mpl(self) -> tuple[plt.Figure, plt.Axes]:
         # Make the basic matplotlib image
         # returns Figure, Axis
         raise NotImplementedError
