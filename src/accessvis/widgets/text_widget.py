@@ -36,4 +36,3 @@ class TextWidget(WidgetMPL):
 
     def _reset_mpl(self, fig, ax, **kwargs):
         self.text.set_text("")
-

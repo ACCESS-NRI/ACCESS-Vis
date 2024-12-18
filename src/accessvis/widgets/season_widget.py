@@ -1,8 +1,8 @@
 import datetime
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
 
 from .widget_base import WidgetMPL
 

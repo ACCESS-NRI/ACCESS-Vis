@@ -59,7 +59,7 @@ class CalendarWidget(WidgetMPL):
             return
         else:
             day_of_year = date.timetuple().tm_yday - 1
-            position = day_of_year / 365. * np.pi * 2.0
+            position = day_of_year / 365.0 * np.pi * 2.0
             self.arrow = ax.arrow(
                 position,
                 0,
@@ -68,7 +68,7 @@ class CalendarWidget(WidgetMPL):
                 facecolor="#fff",
                 width=0.1,
                 head_length=2,
-                edgecolor="black"
+                edgecolor="black",
             )  # , zorder=11, width=1)
 
     def _reset_mpl(self, fig, ax, **kwargs):
