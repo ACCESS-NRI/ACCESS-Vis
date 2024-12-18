@@ -1,6 +1,6 @@
+import os
 from abc import ABC, abstractmethod
 from functools import cached_property
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,9 +25,16 @@ class Widget(ABC):
         vert_path = os.path.join(Settings.INSTALL_PATH, "widgets", "screen.vert")
         frag_path = os.path.join(Settings.INSTALL_PATH, "widgets", "screen.frag")
 
-        self.overlay = self.lv.screen(shaders=[vert_path, frag_path], vertices=[[0, 0, 0]], texture="blank.png")
+        self.overlay = self.lv.screen(
+            shaders=[vert_path, frag_path], vertices=[[0, 0, 0]], texture="blank.png"
+        )
 
-        self.lv.set_uniforms(self.overlay["name"], scale=self.scale, offset=self.offset, widthToHeight=x / y)
+        self.lv.set_uniforms(
+            self.overlay["name"],
+            scale=self.scale,
+            offset=self.offset,
+            widthToHeight=x / y
+        )
         self.overlay.texture(pixels)  # Clear texture with transparent image
 
     @abstractmethod
