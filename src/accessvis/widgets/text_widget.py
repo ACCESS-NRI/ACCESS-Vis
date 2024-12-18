@@ -5,13 +5,13 @@ from .widget_base import WidgetMPL
 
 class TextWidget(WidgetMPL):
     def __init__(
-            self,
-            lv,
-            width=300,
-            height=50,
-            text_colour="black",
-            background=(0, 0, 0, 0),
-            **kwargs
+        self,
+        lv,
+        width=300,
+        height=50,
+        text_colour="black",
+        background=(0, 0, 0, 0),
+        **kwargs
     ):
         super().__init__(lv, **kwargs)
         self.width = width

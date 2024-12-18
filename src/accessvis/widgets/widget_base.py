@@ -33,7 +33,7 @@ class Widget(ABC):
             self.overlay["name"],
             scale=self.scale,
             offset=self.offset,
-            widthToHeight=x / y
+            widthToHeight=x / y,
         )
         self.overlay.texture(pixels)  # Clear texture with transparent image
 

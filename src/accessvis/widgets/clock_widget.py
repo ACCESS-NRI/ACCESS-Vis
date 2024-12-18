@@ -8,14 +8,14 @@ from .widget_base import WidgetMPL
 
 class ClockWidget(WidgetMPL):
     def __init__(
-            self,
-            lv,
-            text_colour="white",
-            background="black",
-            show_seconds=False,
-            show_minutes=True,
-            show_hours=True,
-            **kwargs
+        self,
+        lv,
+        text_colour="white",
+        background="black",
+        show_seconds=False,
+        show_minutes=True,
+        show_hours=True,
+        **kwargs
     ):
         super().__init__(lv=lv, **kwargs)
         self.text_colour = text_colour
@@ -52,10 +52,10 @@ class ClockWidget(WidgetMPL):
         minute = time.minute
         second = time.second
         angles_h = (
-                2 * np.pi * hour / 12 + 2 * np.pi * minute / (12 * 60) + 2 * second / (12 * 60 * 60) - np.pi / 6.0
+            2 * np.pi * hour / 12 + 2 * np.pi * minute / (12 * 60) + 2 * second / (12 * 60 * 60) - np.pi / 6.0
         )
         angles_m = (
-                2 * np.pi * minute / 60 + 2 * np.pi * second / (60 * 60) - np.pi / 6.0
+            2 * np.pi * minute / 60 + 2 * np.pi * second / (60 * 60) - np.pi / 6.0
         )
         angles_s = 2 * np.pi * second / 60 - np.pi / 6.0
 

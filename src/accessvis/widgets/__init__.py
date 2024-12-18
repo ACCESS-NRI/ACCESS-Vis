@@ -4,3 +4,6 @@ from .calendar_widget import CalendarWidget
 from .clock_widget import ClockWidget
 from .image_widget import ImageWidget
 from .text_widget import TextWidget
+
+_ = (Widget, WidgetMPL, list_widgets, SeasonWidget) # to stop the linter complaining
+_ = (CalendarWidget, ClockWidget, ImageWidget, TextWidget)

@@ -1,8 +1,8 @@
 import calendar
 import datetime
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 from .widget_base import WidgetMPL
 
@@ -60,9 +60,16 @@ class CalendarWidget(WidgetMPL):
         else:
             day_of_year = date.timetuple().tm_yday - 1
             position = day_of_year / 365. * np.pi * 2.0
-            self.arrow = ax.arrow(position, 0, 0, 8.5,
-                                  facecolor="#fff", width=0.1, head_length=2,
-                                  edgecolor="black")  # , zorder=11, width=1)
+            self.arrow = ax.arrow(
+                position,
+                0,
+                0,
+                8.5,
+                facecolor="#fff",
+                width=0.1,
+                head_length=2,
+                edgecolor="black"
+            )  # , zorder=11, width=1)
 
     def _reset_mpl(self, fig, ax, **kwargs):
         fig.suptitle("")
