@@ -1,6 +1,4 @@
-import numpy as np
-import imageio
-
+import matplotlib.pyplot as plt
 from .widget_base import Widget
 
 
@@ -10,6 +8,4 @@ class ImageWidget(Widget):
         self.file_path = file_path
 
     def _make_pixels(self, *args, **kwargs):
-        img = imageio.imread(self.file_path)
-        array = np.asarray(img)
-        return array
+        return plt.imread(self.file_path)
