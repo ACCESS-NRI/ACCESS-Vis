@@ -93,6 +93,9 @@ vec3 rgb2hsv(vec3 c)
 
 void main(void)
 {
+  //Clip planes in X/Y/Z
+  if (any(lessThan(vVertex, uClipMin)) || any(greaterThan(vVertex, uClipMax))) discard;
+
   float alpha = 1.0; //fColour.a;
 float mask = 0.0;
 vec4 tColour = texture(uTexture, vTexCoord);
