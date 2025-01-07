@@ -1248,6 +1248,61 @@ def lookat(lv, pos, lookat=None, up=None):
     lv.translation(tr)
 
 
+class Camera:
+    lv = None
+
+    def __init__(self, lv):
+        self.lv = lv
+
+    def look_at(self, pos, at=None, up=None):
+        lookat(self.lv, pos, at, up)
+
+    def lerpto(self, pos, L):
+        # Lerp using current camera orientation as start point
+        pos0 = self.lv.camera(quiet=True)
+        return self.lerp(pos0, pos)
+
+    def lerp(self, pos0, pos1, L):
+        """
+        Linearly Interpolate between two camera positions/orientations and
+        set the camera to the resulting position/orientation
+        """
+        final = {}
+        for key in ["translate", "rotate", "focus"]:
+            val0 = np.array(pos0[key])
+            val1 = np.array(pos1[key])
+            res = val0 + (val1 - val0) * L
+            if len(res) > 3:
+                # Normalise quaternion
+                res = res / np.linalg.norm(res)
+            final[key] = res.tolist()
+
+        self.lv.camera(final)
+
+    def flyto(self, pos, steps, stop=False):
+        # Fly using current camera orientation as start point
+        pos0 = self.lv.camera(quiet=True)
+        return self.fly(pos0, pos, steps, stop)
+
+    def fly(self, pos0, pos1, steps, stop=False):
+        # self.lv.translation(*tr0)
+        # self.lv.rotation(*rot0)
+        self.lv.camera(pos0)
+        self.lv.render()
+
+        for i in range(steps):
+            if stop and i > stop:
+                break
+            L = i / (steps - 1)
+            self.lerp(pos0, pos1, L)
+            self.lv.render()
+
+    def pause(self, frames=50):
+        # Render pause
+        for i in range(frames):
+            self.lv.render()
+
+
 def sun_light(
     time=None,
     now=False,
