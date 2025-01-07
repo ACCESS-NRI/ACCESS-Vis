@@ -222,19 +222,32 @@ def paste_image(fn, xpos, ypos, out):
     out[yoff : yoff + col.shape[1], xoff : xoff + col.shape[0]] = col
 
 
-def latlon_to_3D(lat, lon, alt=0):
+def lonlat_to_3D(lon, lat, alt=0):
     """
     Convert lat/lon coord to 3D coordinate for visualisation
     Uses simple spherical earth rather than true ellipse
     see http://www.mathworks.de/help/toolbox/aeroblks/llatoecefposition.html
     https://stackoverflow.com/a/20360045
     """
-    return latlon_to_3D_true(lat, lon, alt, flattening=0.0)
+    return lonlat_to_3D_true(lon, lat, alt, flattening=0.0)
 
 
-def latlon_to_3D_true(lat, lon, alt=0, flattening=1.0 / 298.257223563):
+def latlon_to_3D(lat, lon, alt=0, flattening=0.0):
     """
-    Convert lat/lon coord to 3D coordinate for visualisation
+    Convert lon/lat coord to 3D coordinate for visualisation
+
+    Provided for backwards compatibility as main function now reverses arg order of
+    (lat, lon) to (lon, lat)
+    """
+    return lonlat_to_3D_true(lon, lat, alt, flattening)
+
+
+def lonlat_to_3D_true(lon, lat, alt=0, flattening=1.0 / 298.257223563):
+    """
+    Convert lon/lat coord to 3D coordinate for visualisation
+    Now using longitude, latitude, altitude order for more natural argument order
+    longitude=x, latitude=y, altitude=z
+
     Uses flattening factor for elliptical earth
     see http://www.mathworks.de/help/toolbox/aeroblks/llatoecefposition.html
     https://stackoverflow.com/a/20360045
