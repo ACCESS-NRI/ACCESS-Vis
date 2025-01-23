@@ -4,6 +4,7 @@ import sys
 from . import _version
 from .earth import *
 from .utils import *
+from .widgets import *
 
 # Add current directory to sys.path because python is deranged
 sys.path.append(os.path.dirname(__file__))
