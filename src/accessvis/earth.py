@@ -222,19 +222,32 @@ def paste_image(fn, xpos, ypos, out):
     out[yoff : yoff + col.shape[1], xoff : xoff + col.shape[0]] = col
 
 
-def latlon_to_3D(lat, lon, alt=0):
+def lonlat_to_3D(lon, lat, alt=0):
     """
     Convert lat/lon coord to 3D coordinate for visualisation
     Uses simple spherical earth rather than true ellipse
     see http://www.mathworks.de/help/toolbox/aeroblks/llatoecefposition.html
     https://stackoverflow.com/a/20360045
     """
-    return latlon_to_3D_true(lat, lon, alt, flattening=0.0)
+    return lonlat_to_3D_true(lon, lat, alt, flattening=0.0)
 
 
-def latlon_to_3D_true(lat, lon, alt=0, flattening=1.0 / 298.257223563):
+def latlon_to_3D(lat, lon, alt=0, flattening=0.0):
     """
-    Convert lat/lon coord to 3D coordinate for visualisation
+    Convert lon/lat coord to 3D coordinate for visualisation
+
+    Provided for backwards compatibility as main function now reverses arg order of
+    (lat, lon) to (lon, lat)
+    """
+    return lonlat_to_3D_true(lon, lat, alt, flattening)
+
+
+def lonlat_to_3D_true(lon, lat, alt=0, flattening=1.0 / 298.257223563):
+    """
+    Convert lon/lat coord to 3D coordinate for visualisation
+    Now using longitude, latitude, altitude order for more natural argument order
+    longitude=x, latitude=y, altitude=z
+
     Uses flattening factor for elliptical earth
     see http://www.mathworks.de/help/toolbox/aeroblks/llatoecefposition.html
     https://stackoverflow.com/a/20360045
@@ -1188,51 +1201,6 @@ def vector_align(v1, v2, lvformat=True):
         return [qr.x, qr.y, qr.z, qr.w]
     else:
         return qr
-
-
-def lookat(lv, pos, lookat=None, up=None):
-    """
-    Set the camera with a position coord and lookat coord
-
-    Parameters
-    ----------
-    lv : lavavu.Viewer
-        The viewer object
-    pos : list/numpy.ndarray
-        Camera position in world coords
-    lookat : list/numpy.ndarray
-        Look at position in world coords, defaults to model origin
-    up : list/numpy.ndarray
-        Up vector, defaults to Y axis [0,1,0]
-    """
-
-    # Use the origin from viewer if no target provided
-    if lookat is None:
-        lookat = lv["focus"]
-    else:
-        lv["focus"] = lookat
-
-    # Default to Y-axis up vector
-    if up is None:
-        up = np.array([0, 1, 0])
-
-    # Calculate the rotation matrix
-    heading = np.array(pos) - np.array(lookat)
-    zd = normalise(heading)
-    xd = normalise(np.cross(up, zd))
-    yd = normalise(np.cross(zd, xd))
-    q = quat.from_rotation_matrix(np.array([xd, yd, zd]))
-    q = q.normalized()
-
-    # Apply the rotation
-    lv.rotation(q.x, q.y, q.z, q.w)
-
-    # Translate back by heading vector length in Z
-    # (model origin in lavavu takes care of lookat offset)
-    tr = [0, 0, -magnitude(np.array(pos) - np.array(lookat))]
-
-    # Apply translation
-    lv.translation(tr)
 
 
 def sun_light(
