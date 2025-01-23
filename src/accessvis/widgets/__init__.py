@@ -1,9 +1,6 @@
-from .calendar_widget import CalendarWidget
-from .clock_widget import ClockWidget
-from .image_widget import ImageWidget
-from .season_widget import SeasonWidget
-from .text_widget import TextWidget
-from .widget_base import Widget, WidgetMPL, list_widgets
-
-_ = (Widget, WidgetMPL, list_widgets, SeasonWidget)  # to stop the linter complaining
-_ = (CalendarWidget, ClockWidget, ImageWidget, TextWidget)
+from .widget_base import Widget, WidgetMPL, list_widgets  # noqa: F401
+from .season_widget import SeasonWidget  # noqa: F401
+from .calendar_widget import CalendarWidget  # noqa: F401
+from .clock_widget import ClockWidget  # noqa: F401
+from .image_widget import ImageWidget  # noqa: F401
+from .text_widget import TextWidget  # noqa: F401
