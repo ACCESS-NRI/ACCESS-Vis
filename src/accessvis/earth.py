@@ -1018,6 +1018,25 @@ def plot_earth(
     return lv
 
 
+def earth_patch(lv, latitudes, longitudes, altitude=0.001, name="earth_patch"):
+    """
+    latitudes and longitudes: ndarray
+    altitude: height above sea level in km.
+
+    patch = earth_patch(lv, latitude, longitude)
+    patch.texture(data, flip=False)
+    """
+
+    altitudes = np.zeros_like(latitudes) + altitude
+    arrays = latlon_to_3D(latitudes, longitudes, altitudes)
+    grid = np.dstack(arrays)
+
+    tris0 = lv.surface(name, renderer='sortedtriangles', ambient=0.9)
+    tris0.vertices(grid)
+
+    return tris0
+
+
 def update_earth_datetime(
     lv, when, name="", texture=None, sunlight=False, blendtex=True
 ):
