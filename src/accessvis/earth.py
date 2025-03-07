@@ -1018,23 +1018,58 @@ def plot_earth(
     return lv
 
 
-def earth_patch(lv, longitudes, latitudes, altitude=0.001, name="earth_patch"):
+def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
+    """
+    Creates a grid of 3D vertices representing a regional 2D grid converted from lat,lon coords
+    Used for plotting data arrays on a 3D earth plot
+    Can provide corner coords and a sampling resolution or just the raw lat,lon coords
+
+    Parameters
+    ----------
+    longitudes: ndarray or tuple
+        List of longitude values or min/max longitude as a tuple
+    latitudes: ndarray or tuple
+        List of latitude values or min/max latitude as a tuple
+    altitudes: float
+        height above sea level in Mm
+        Will fill this value in a fixed height grid
+    resolution: 2-tuple
+        Resolution of the 2d grid, if provided will use corner points from
+        longitudes,latitudes only an sample a regular grid between them of
+        provided resolution
+
+    Returns
+    -------
+    ndarray: the 3D vertices of the 2D grid
+    """
+
+    xx = np.array(longitudes)
+    yy = np.array(latitudes)
+    if resolution is not None:
+        # Use corners and create a sampling grid of this resolution
+        xx = np.linspace(xx.min(), xx.max(), resolution[0])
+        yy = np.linspace(yy.min(), yy.max(), resolution[1])
+
+    lon, lat = np.meshgrid(xx, yy, indexing="ij")  # X,Y,Z
+
+    arrays = lonlat_to_3D(lon, lat, altitude)
+
+    return np.dstack(arrays)
+
+
+def earth_patch(
+    lv, longitudes, latitudes, altitude=0.001, name="earth_patch", **kwargs
+):
     """
     latitudes and longitudes: ndarray
-    altitude: height above sea level in km.
+    altitude: height above sea level in Mm.
 
-    patch = earth_patch(lv, latitude, longitude)
+    patch = earth_patch(lv, longitude, latitude)
     patch.texture(data, flip=False)
     """
 
-    altitudes = np.zeros_like(latitudes) + altitude
-    arrays = latlon_to_3D(latitudes, longitudes, altitudes)
-    grid = np.dstack(arrays)
-
-    tris0 = lv.surface(name, renderer='sortedtriangles', ambient=0.9)
-    tris0.vertices(grid)
-
-    return tris0
+    grid = lonlat_grid_3D(longitudes, latitudes, altitude)
+    return lv.surface(name, vertices=grid, **kwargs)
 
 
 def update_earth_datetime(
