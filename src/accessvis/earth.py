@@ -1018,7 +1018,7 @@ def plot_earth(
     return lv
 
 
-def earth_patch(lv, latitudes, longitudes, altitude=0.001, name="earth_patch"):
+def earth_patch(lv, longitudes, latitudes, altitude=0.001, name="earth_patch"):
     """
     latitudes and longitudes: ndarray
     altitude: height above sea level in km.
