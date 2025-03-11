@@ -729,7 +729,11 @@ def plot_region(
     """
     if lv is None:
         lv = get_viewer(
-            border=False, axis=False, resolution=[1280, 720], background=background
+            border=False,
+            axis=False,
+            resolution=[1280, 720],
+            background=background,
+            fliptexture=False,
         )
 
     # Custom uniforms / additional textures
@@ -874,7 +878,11 @@ def plot_earth(
     """
     if lv is None:
         lv = get_viewer(
-            border=False, axis=False, resolution=[1280, 720], background=background
+            border=False,
+            axis=False,
+            resolution=[1280, 720],
+            background=background,
+            fliptexture=False,
         )
 
     topo = load_topography_cubemap(
@@ -1035,7 +1043,7 @@ def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
         Will fill this value in a fixed height grid
     resolution: 2-tuple
         Resolution of the 2d grid, if provided will use corner points from
-        longitudes,latitudes only an sample a regular grid between them of
+        longitudes,latitudes only and sample a regular grid between them of
         provided resolution
 
     Returns
@@ -1043,33 +1051,92 @@ def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
     ndarray: the 3D vertices of the 2D grid
     """
 
-    xx = np.array(longitudes)
-    yy = np.array(latitudes)
+    x = np.array(longitudes)
+    y = np.array(latitudes)
     if resolution is not None:
         # Use corners and create a sampling grid of this resolution
-        xx = np.linspace(xx.min(), xx.max(), resolution[0])
-        yy = np.linspace(yy.min(), yy.max(), resolution[1])
+        x = np.linspace(x[0], x[-1], resolution[0])
+        y = np.linspace(y[0], y[-1], resolution[1])
 
-    lon, lat = np.meshgrid(xx, yy, indexing="ij")  # X,Y,Z
+    lon, lat = np.meshgrid(x, y, indexing="ij")  # X,Y,Z
 
     arrays = lonlat_to_3D(lon, lat, altitude)
 
     return np.dstack(arrays)
 
 
-def earth_patch(
-    lv, longitudes, latitudes, altitude=0.001, name="earth_patch", **kwargs
+def earth_2d_plot(
+    lv,
+    data=None,
+    colourmap="viridis",
+    opacitymap=None,
+    opacitypower=1,
+    longitudes=None,
+    latitudes=None,
+    altitude=1e-6,
+    resolution=None,
+    **kwargs,
 ):
     """
-    latitudes and longitudes: ndarray
-    altitude: height above sea level in Mm.
+    Plots a surface on the 3D earth given an xarray DataArray
 
-    patch = earth_patch(lv, longitude, latitude)
-    patch.texture(data, flip=False)
+    Calls lonlat_grid_3D, creates a mesh of required resolution and plots the data as a texture
+
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The viewer object to plot with
+    data: xarray.DataArray, ndarray
+        The data to plot, either a numpy array, in which case latitudes + longitudes must be passed to define the corners/grid
+        Otherwise xarray data should only have two coords, if more need to select down to required data in 2d
+        Assumes the first coordinate of the array is longitude and second is latitude
+        If order is reversed, need to transpose before passing, eg: data.transpose('latitude', 'longitude')
+        If omitted, will skip texturing
+    longitudes: ndarray or tuple
+        List of longitude values or min/max longitude as a tuple
+    latitudes: ndarray or tuple
+        List of latitude values or min/max latitude as a tuple
+    altitudes: float
+        height above sea level in Mm, defaults to 1m above sea level
+        Will fill this value in a fixed height grid
+    resolution: 2-tuple
+        Resolution of the 2d grid, if provided will use corner points from
+        data only and sample a regular grid between them of provided resolution
+
+    Returns
+    -------
+    lavavu.Object: the drawing object created
+
+    Example
+    -------
+
+    >>> import lavavu, accessvis
+    >>> lv = lavavu.Viewer()
+    >>> surf = accessvis.earth_2d_plot(data, resolition=(100,100), colourmap='viridis')
     """
+    if data is not None and latitudes is None or longitudes is None:
+        keys = list(data.coords.keys())
+        if len(keys) < 2:
+            print("Data must have 2 dimensions in order longitude, latitude")
+            return None
+        longitudes = data[keys[0]]
+        latitudes = data[keys[1]]
 
-    grid = lonlat_grid_3D(longitudes, latitudes, altitude)
-    return lv.surface(name, vertices=grid, **kwargs)
+    # Set default blank texture - forces texcoord load
+    if "texture" not in kwargs:
+        kwargs["texture"] = str(settings.INSTALL_PATH / "data" / "blank.png")
+    # Set default transparent colour
+    if "colour" not in kwargs:
+        kwargs["colour"] = "rgba(0,0,0,0)"
+
+    grid = lonlat_grid_3D(longitudes, latitudes, altitude, resolution)
+    surf = lv.surface(vertices=grid, **kwargs)
+    if data is not None:
+        imgarr = array_to_rgba(
+            data, colourmap=colourmap, opacitymap=opacitymap, opacitypower=opacitypower
+        )
+        surf.texture(imgarr, flip=False)
+    return surf
 
 
 def update_earth_datetime(
@@ -1407,6 +1474,7 @@ def array_to_rgba(
     flip=False,
     opacity=0.0,
     opacitymap=False,
+    opacitypower=1,
 ):
     """
     Array to rgba texture using a matplotlib colourmap
@@ -1431,6 +1499,9 @@ def array_to_rgba(
     opacitymap: bool or numpy.ndarray
         Set to true to use values as an opacity map, top of range will be opaque, bottom transparent
         Provide an array to use a different opacity map dataset
+    opacitypower: float
+        Power to apply to values when calculating opacity map,
+        eg: 0.5 equivalent to opacity = sqrt(value), 2 equivalent to opacity = value*value
     """
 
     array = normalise_array(values, minimum, maximum)
@@ -1461,19 +1532,29 @@ def array_to_rgba(
     if opacity:
         if opacity <= 1.0:
             opacity = int(255 * opacity)
-        rgba[::, ::, 3] = opacity
-    elif opacitymap is True:  # ndarrays are incompatible with bool().
-        oarray = (array * 255).round().astype(np.uint8)
+        rgba[::, ::, 3] = array([(0 if x == np.nan else opacity) for x in array])
+    elif opacitymap is True:
+        oarray = array
+        if opacitypower != 1:
+            oarray = np.power(oarray, opacitypower)
+        # Mask NaN
+        oarray = np.nan_to_num(oarray)
+        oarray = (oarray * 255).astype(np.uint8)
         rgba[::, ::, 3] = oarray
-    elif hasattr(opacitymap, "__array__"):  # numpy compatible object
+    elif hasattr(opacitymap, "__array__"):
         oarray = normalise_array(opacitymap)
         if flip:
-            oarray = np.flipud(np.array(oarray))
-        if oarray.max() <= 1.0:
-            oarray = (oarray * 255).round().astype(np.uint8)
-        rgba[::, ::, 3] = oarray
+            oarray = np.flipud(oarray)
+        if opacitypower != 1:
+            oarray = np.power(oarray, opacitypower)
+        # Mask NaN
+        oarray = np.nan_to_num(oarray)
+        oarray = (oarray * 255).astype(np.uint8)
     elif opacitymap:
         raise TypeError("Unknown opacitymap type: Expected bool or ndarray")
+    else:
+        # Opaque, Mask out NaN
+        rgba[::, ::, 3] = array([(0 if x == np.nan else 1) for x in array])
 
     return rgba
 
