@@ -22,8 +22,8 @@ class Widget(ABC):
         pixels[::, ::, ::] = 0
         y, x, c = np.shape(pixels)
 
-        vert_path = os.path.join(Settings.INSTALL_PATH, "widgets", "screen.vert")
-        frag_path = os.path.join(Settings.INSTALL_PATH, "widgets", "screen.frag")
+        vert_path = os.path.join(Settings.INSTALL_PATH, "data", "screen.vert")
+        frag_path = os.path.join(Settings.INSTALL_PATH, "data", "screen.frag")
 
         self.overlay = self.lv.screen(
             shaders=[vert_path, frag_path], vertices=[[0, 0, 0]], texture="blank.png"
