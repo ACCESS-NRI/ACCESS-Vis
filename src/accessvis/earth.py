@@ -1129,7 +1129,19 @@ def earth_2d_plot(
     if "colour" not in kwargs:
         kwargs["colour"] = "rgba(0,0,0,0)"
 
-    grid = lonlat_grid_3D(longitudes, latitudes, altitude, resolution)
+    lon = np.array(longitudes)
+    lat = np.array(latitudes)
+    if len(lon.shape) == 2 and len(lat.shape) == 2:
+        # Already passed 2d grid of lon/lat values
+        # Just need to convert to 3D coords
+        arrays = lonlat_to_3D(lon, lat, altitude)
+        grid = np.dstack(arrays)
+    elif len(lon.shape) == 1 and len(lat.shape) == 1:
+        # Passed 1d arrays of lon/lat, create a grid
+        grid = lonlat_grid_3D(longitudes, latitudes, altitude, resolution)
+    else:
+        raise (ValueError("Unknown data format for latitude and longitude params"))
+
     surf = lv.surface(vertices=grid, **kwargs)
     if data is not None:
         imgarr = array_to_rgba(
