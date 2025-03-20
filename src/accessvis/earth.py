@@ -1544,7 +1544,8 @@ def array_to_rgba(
     if opacity:
         if opacity <= 1.0:
             opacity = int(255 * opacity)
-        rgba[::, ::, 3] = array([(0 if x == np.nan else opacity) for x in array])
+        # THIS IS BROKEN, doesn't work for 2d image
+        # rgba[::, ::, 3] = array([(0 if x == np.nan else opacity) for x in array])
     elif opacitymap is True:
         oarray = array
         if opacitypower != 1:
@@ -1566,7 +1567,9 @@ def array_to_rgba(
         raise TypeError("Unknown opacitymap type: Expected bool or ndarray")
     else:
         # Opaque, Mask out NaN
-        rgba[::, ::, 3] = array([(0 if x == np.nan else 1) for x in array])
+        # THIS IS BROKEN, doesn't work for 2d image
+        # rgba[::, ::, 3] = array([(0 if x == np.nan else 1) for x in array])
+        pass
 
     return rgba
 
