@@ -26,7 +26,10 @@ class Widget(ABC):
         frag_path = os.path.join(Settings.INSTALL_PATH, "data", "screen.frag")
 
         self.overlay = self.lv.screen(
-            shaders=[vert_path, frag_path], vertices=[[0, 0, 0]], texture="blank.png"
+            shaders=[vert_path, frag_path],
+            vertices=[[0, 0, 0]],
+            texture="blank.png",
+            fliptexture=True,
         )
 
         self.lv.set_uniforms(
