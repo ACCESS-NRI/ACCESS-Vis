@@ -31,10 +31,8 @@ class SeasonWidget(WidgetMPL):
         self.hemisphere = hemisphere.lower()
         self.arrow = None
 
-        if self.hemisphere not in ('south', 'north'):
-            raise ValueError(
-                f"Invalid hemisphere '{hemisphere}'. Please use either 'north' or 'south'."
-                )
+        if self.hemisphere not in ("south", "north"):
+            raise ValueError(f"Hemisphere should be 'north' or 'south'.")
 
     def _make_mpl(self):
         """
