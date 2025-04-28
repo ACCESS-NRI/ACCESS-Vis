@@ -102,10 +102,10 @@ class Widget(ABC):
 
 class WidgetMPL(Widget):
     """
-        This is the base class for creating a Widget using a Matplotlib.
-        _make_mpl() initialises up the mpl figure.
-        _update_mpl() Updates mpl figure for animations.
-        _reset_mpl() resets the mpl figure to the initial state.
+    This is the base class for creating a Widget using a Matplotlib.
+    _make_mpl() initialises up the mpl figure.
+    _update_mpl() Updates mpl figure for animations.
+    _reset_mpl() resets the mpl figure to the initial state.
     """
 
     @abstractmethod
