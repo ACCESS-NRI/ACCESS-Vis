@@ -17,6 +17,29 @@ class ClockWidget(WidgetMPL):
         show_hours=True,
         **kwargs
     ):
+        """
+        Create a clock face to indicate the time of day.
+
+        Parameters
+        ----------
+        lv: lavavu.Viewer
+            The viewer object to plot with.
+        text_colour:
+            Matplotlib compatable colour.
+        background:
+            Matplotlib compatable colour.
+        show_hours: bool
+            Whether or not to show the hour hand.
+        show_minutes: bool
+            Whether or not to show the minute hand.
+        show_seconds: bool
+            Whether or not to show the second hand.
+        scale: float
+            The size of the widget, where 1.0 means it will take up the entire height of the final image.
+        offset: tuple[float, float]
+            The position of the widget, with (0,0) placing it in the top left, and (1,1) the bottom right.
+        """
+
         super().__init__(lv=lv, **kwargs)
         self.text_colour = text_colour
         self.background = background
@@ -25,8 +48,11 @@ class ClockWidget(WidgetMPL):
         self.show_seconds = show_seconds
         self.lines = []
 
-    # based on https://inprogrammer.com/analog-clock-python/
     def _make_mpl(self):
+        """
+        Creates a blank clock face.
+        Based on https://inprogrammer.com/analog-clock-python/
+        """
         fig = plt.figure(figsize=(2.5, 2.5), dpi=100)
         fig.patch.set_facecolor((0, 0, 0, 0))  # make background transparent
         ax = fig.add_subplot(111, polar=True)
@@ -45,6 +71,14 @@ class ClockWidget(WidgetMPL):
         return fig, ax
 
     def _update_mpl(self, fig, ax, time: datetime.time = None, **kwargs):
+        """
+        Adds clock hands.
+
+        Parameters
+        ----------
+        time: datetime.time
+        """
+
         if time is None:
             return
 
@@ -79,6 +113,9 @@ class ClockWidget(WidgetMPL):
             self.lines.extend(lines)
 
     def _reset_mpl(self, fig, ax, **kwargs):
+        """
+        Removes the clock hands.
+        """
         for i in self.lines:
             i.remove()
         self.lines.clear()

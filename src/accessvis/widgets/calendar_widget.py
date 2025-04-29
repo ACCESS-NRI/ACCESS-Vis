@@ -9,12 +9,28 @@ from .widget_base import WidgetMPL
 
 class CalendarWidget(WidgetMPL):
     def __init__(self, lv, text_colour="black", **kwargs):
+        """
+        Create a round dial with an arrow to indicate the time of the year.
+
+        Parameters
+        ----------
+        lv: lavavu.Viewer
+            The viewer object to plot with.
+        text_colour:
+            Matplotlib compatible colour.
+        scale: float
+            The size of the widget, where 1.0 means it will take up the entire height of the final image.
+        offset: tuple[float, float]
+            The position of the widget, with (0,0) placing it in the top left, and (1,1) the bottom right.
+        """
         super().__init__(lv=lv, **kwargs)
         self.text_colour = text_colour
         self.arrow = None
 
     def _make_mpl(self):
-
+        """
+        Creates the round dial with the months listed.
+        """
         plt.rc("axes", linewidth=4)
         plt.rc("font", weight="bold")
         fig, ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(5, 5))
@@ -47,6 +63,16 @@ class CalendarWidget(WidgetMPL):
         return fig, ax
 
     def _update_mpl(self, fig, ax, date: datetime.datetime = None, show_year=True):
+        """
+        Adds an arrow to point to the time of year.
+
+        Parameters
+        ----------
+        date: date or datetime
+            The time of year the dial should point to.
+        show_year: bool
+            If true, the current year is displayed below the dial.
+        """
         if show_year and date is not None:
             title = str(date.year)
         else:
@@ -72,6 +98,9 @@ class CalendarWidget(WidgetMPL):
             )  # , zorder=11, width=1)
 
     def _reset_mpl(self, fig, ax, **kwargs):
+        """
+        Removes the arrow from the figure.
+        """
         fig.suptitle("")
         if self.arrow is not None:
             self.arrow.remove()
