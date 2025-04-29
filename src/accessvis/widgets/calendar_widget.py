@@ -17,7 +17,7 @@ class CalendarWidget(WidgetMPL):
         lv: lavavu.Viewer
             The viewer object to plot with.
         text_colour:
-            Matplotlib compatable colour.
+            Matplotlib compatible colour.
         scale: float
             The size of the widget, where 1.0 means it will take up the entire height of the final image.
         offset: tuple[float, float]
