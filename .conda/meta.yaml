@@ -18,7 +18,7 @@ requirements:
     - pip
     - versioneer
   run:
-    - python >=3.9
+    - python >=3.11
     - pillow
     - matplotlib
     - ipywidgets
