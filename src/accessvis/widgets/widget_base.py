@@ -117,7 +117,7 @@ class WidgetMPL(Widget):
         Returns
         -------
         matplotlib.figure.Figure
-        matplotlib.figure.Axis
+        matplotlib.figure.Axes
         """
 
         raise NotImplementedError
@@ -125,12 +125,12 @@ class WidgetMPL(Widget):
     @abstractmethod
     def _update_mpl(self, fig, ax, **kwargs):
         """
-        Update the mpl Figure and Axis objects to make an animation.
+        Update the mpl Figure and Axes objects to make an animation.
 
         Parameters
         ----------
         fig: matplotlib.figure.Figure
-        ax: matplotlib.figure.Axis
+        ax: matplotlib.figure.Axes
         **kwargs:
             Arbitrary arguments may be provided to dynamically generate the image (e.g. date).
             These same arguments must be passed when the update_widget() method is called.
@@ -151,7 +151,7 @@ class WidgetMPL(Widget):
         Parameters
         ----------
         fig: matplotlib.figure.Figure
-        ax: matplotlib.figure.Axis
+        ax: matplotlib.figure.Axes
         **kwargs:
             Arbitrary arguments may be provided to help reset the image.
             These same arguments must be passed when the update_widget() method is called.
@@ -173,7 +173,7 @@ class WidgetMPL(Widget):
         return self._cache_mpl[0]
 
     @property
-    def ax(self) -> plt.Axis:
+    def ax(self) -> plt.Axes:
         return self._cache_mpl[1]
 
     def _make_pixels(self, **kwargs):
