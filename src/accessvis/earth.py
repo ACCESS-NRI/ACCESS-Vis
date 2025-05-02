@@ -9,7 +9,6 @@ from contextlib import closing
 from io import BytesIO
 from pathlib import Path
 
-import lavavu
 import matplotlib
 import numpy as np
 import py360convert
@@ -18,6 +17,21 @@ import xarray as xr
 from PIL import Image
 
 from .utils import download, is_notebook, pushd
+
+# Before lavavu import...
+# OpenGL context setup for gadi
+hostname = os.getenv("HOSTNAME", "")
+gadi = "gadi.nci.org.au" in hostname
+if gadi:
+    # Enable headless
+    if os.getenv("PBS_NGPUS", "0") == "0":
+        # via osmesa on CPU
+        os.environ["LV_CONTEXT"] = "osmesa"
+    else:
+        # via moderngl/EGL with GPU
+        os.environ["LV_CONTEXT"] = "moderngl"
+
+import lavavu  # noqa: E402
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -36,14 +50,6 @@ class Settings:
 
     # INSTALL_PATH is used for files such as sea-water-normals.png
     INSTALL_PATH = Path(__file__).parents[0]
-
-    # Default to non-headless mode
-    HEADLESS = False
-    hostname = os.getenv("HOSTNAME", "")
-    gadi = "gadi.nci.org.au" in hostname
-    if gadi:
-        # Enable headless via moderngl when running on gadi
-        HEADLESS = True
 
     # Where data is stored, should use public cache dir on gadi
     # Check if the data directory is specified in environment variables
@@ -72,37 +78,6 @@ class Settings:
 
 
 settings = Settings()
-
-
-def get_viewer(*args, **kwargs):
-    """
-
-    Parameters
-    ----------
-    arguments for lavavu.Viewer().
-    See https://lavavu.github.io/Documentation/lavavu.html#lavavu.Viewer for more documentation.
-
-    Returns
-    -------
-    return: lavavu.Viewer
-    """
-    if settings.HEADLESS:
-        from importlib import metadata, util
-
-        try:
-            # If this fails, lavavu-osmesa was installed
-            # headless setting not required as implicitly in headless mode
-            metadata.metadata("lavavu")
-            # Also requires moderngl for EGL headless context
-            settings.HEADLESS = util.find_spec("moderngl") is not None
-
-        except (metadata.PackageNotFoundError):
-            settings.HEADLESS = False
-
-    if settings.HEADLESS:
-        return lavavu.Viewer(*args, context="moderngl", **kwargs)
-    else:
-        return lavavu.Viewer(*args, **kwargs)
 
 
 def set_resolution(val):
@@ -424,7 +399,7 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
     if cache and os.path.exists(fn + ".npz"):
         sdata = np.load(fn + ".npz")
     else:
-        lv = get_viewer()
+        lv = lavavu.Viewer()
         tris0 = lv.spheres(
             "sphere",
             scaling=radius,
@@ -728,7 +703,7 @@ def plot_region(
         Multiplier to topography/bathymetry height
     """
     if lv is None:
-        lv = get_viewer(
+        lv = lavavu.Viewer(
             border=False,
             axis=False,
             resolution=[1280, 720],
@@ -877,7 +852,7 @@ def plot_earth(
         "W" = Western hemisphere - antimeridian to prime meridian (Americas)
     """
     if lv is None:
-        lv = get_viewer(
+        lv = lavavu.Viewer(
             border=False,
             axis=False,
             resolution=[1280, 720],

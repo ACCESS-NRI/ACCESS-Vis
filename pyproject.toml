@@ -54,6 +54,7 @@ dependencies = [
   "pillow",
   "py360convert",
   "matplotlib",
+  "requests",
   "wget",
   "numpy",
   "numpy-quaternion",
