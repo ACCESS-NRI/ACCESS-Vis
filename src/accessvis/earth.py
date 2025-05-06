@@ -1800,8 +1800,12 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
             tfn = f"{f}_blue_marble_{month_name2}_{settings.TEXRES}.png"
             url = f"{settings.DATA_URL}bluemarble/cubemap_{settings.TEXRES}/{tfn}"
             download(url, pdir)
+
+        ddir = f"{settings.DATA_PATH}/bluemarble/source_full"
         for m in range(1, 13):
-            download(url, pdir)
+            url = "{settings.DATA_URL}bluemarble/source_full/world.2004{m:02}.3x21600x10800.jpg"
+            download(url, ddir)
+
         return
     except (Exception) as e:
         print(f"Error downloading: {str(e)} attempting to generate files")
