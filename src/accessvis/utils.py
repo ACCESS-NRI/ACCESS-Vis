@@ -96,7 +96,7 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
     }
 
     # Get size of file
-    r = requests.head(url, headers=headers)
+    r = requests.head(url, headers=headers, timeout=5)
     file_size = int(r.headers.get("content-length", 0))
 
     # Set configuration
@@ -132,7 +132,7 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
                 pbar.update(len(chunk))
 
 
-def download(url, path=None, filename=None, overwrite=False, quiet=False, attempts=50):
+def download(url, path=None, filename=None, overwrite=False, quiet=False, attempts=10):
     """
     Download a file from an internet URL,
     Attempts to handle transmission errors and resume partial downloads correctly
@@ -181,6 +181,7 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
                         headers={
                             "User-Agent": user_agent,
                         },
+                        timeout=5,
                     )
 
                     file_size_actual = int(r.headers.get("content-length", 0))
@@ -202,7 +203,9 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
                     downloader(url, filename)
 
                 return filename
-
+            except requests.ConnectTimeout:
+                print("Timeout, aborted")
+                break
             except Exception as e:
                 print(f"Exception {e}, will retry")
                 pass
