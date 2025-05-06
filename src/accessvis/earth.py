@@ -47,6 +47,7 @@ class Settings:
     TEXRES = 2048
     GRIDRES = 1024
     MAXGRIDRES = 4096
+    DATA_URL = "https://object-store.rc.nectar.org.au/v1/AUTH_fb4d732ddb7447d4beeaad299223d953/accessvis/"
 
     # INSTALL_PATH is used for files such as sea-water-normals.png
     INSTALL_PATH = Path(__file__).parents[0]
@@ -592,7 +593,7 @@ def load_topography_cubemap(
     # Load detailed topo data
     if resolution is None:
         resolution = settings.GRIDRES
-    process_gebco()  # Ensure data exists
+    process_gebco(cubemap=True, resolution=resolution)  # Ensure data exists
     fn = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz"
     if not os.path.exists(fn):
         raise (Exception("GEBCO data not found"))
@@ -626,7 +627,7 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
             heights = np.flipud(heights)
 
     if heights is None:
-        process_gebco()  # Ensure data exists
+        process_gebco(cubemap=False, resolution=resolution)  # Ensure data exists
         basefn = f"gebco_equirectangular_{resolution * 2}_x_{resolution}.npz"
         fn = f"{settings.DATA_PATH}/gebco/{basefn}"
         if not os.path.exists(fn):
@@ -1607,48 +1608,59 @@ def load_mask(res_y=None, masktype="watermask", subsample=1, cropbox=None):
     """
     if res_y is None:
         res_y = settings.FULL_RES_Y
-    # Get the tiled high res images
-    os.makedirs(settings.DATA_PATH / "landmask/source_tiled", exist_ok=True)
-    filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
-    if len(glob.glob(filespec)) < 8:
-        # Download tiles
-        for t in bm_tiles:
-            # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
-            url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
-            # print(url)
-            download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
 
     # Calculate full image res to use for specified TEXRES
     ffn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
     if not os.path.exists(ffn):
-        # Combine 4x2 image tiles into single image
-        # [A1][B1][C1][D1]
-        # [A2][B2][C2][D2]
-        mask = np.zeros(shape=(43200, 86400), dtype=np.uint8)
-        for t in bm_tiles:
-            x = ord(t[0]) - ord("A")
-            y = 1 if int(t[1]) == 2 else 0
-            filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
-            paste_image(filespec, x, y, mask)
-
-        # Save full mask in various resolutions
-        for res in [(86400, 43200), (43200, 21600), (21600, 10800)]:
-            r_fn = (
-                f"{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png"
+        """
+        Download pre-processed data from DATA_URL
+        """
+        try:
+            url = (
+                f"{settings.DATA_URL}landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
             )
-            if not os.path.exists(r_fn):
-                # Create medium res mask image
-                mimg = Image.fromarray(mask)
-                if mimg.size != res:
-                    mimg = mimg.resize(res, Image.Resampling.LANCZOS)
-                mimg.save(r_fn)
-            elif res_y == res[1]:
-                image = Image.open(r_fn)
-                mask = np.array(image)
+            download(url, f"{settings.DATA_PATH}/landmask/")
+        except (Exception) as e:
+            print(f"Error downloading: {str(e)} attempting to generate files")
+            # Get the tiled high res images
+            os.makedirs(settings.DATA_PATH / "landmask/source_tiled", exist_ok=True)
+            filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
+            if len(glob.glob(filespec)) < 8:
+                # Download tiles
+                for t in bm_tiles:
+                    # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
+                    # Original url, now using our own copy
+                    # url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
+                    url = f"{settings.DATA_URL}landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
+                    # print(url)
+                    download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
 
-            # Use this mask resolution?
-            if res_y == res[1]:
-                mask = np.array(mimg)
+            # Combine 4x2 image tiles into single image
+            # [A1][B1][C1][D1]
+            # [A2][B2][C2][D2]
+            mask = np.zeros(shape=(43200, 86400), dtype=np.uint8)
+            for t in bm_tiles:
+                x = ord(t[0]) - ord("A")
+                y = 1 if int(t[1]) == 2 else 0
+                filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
+                paste_image(filespec, x, y, mask)
+
+            # Save full mask in various resolutions
+            for res in [(86400, 43200), (43200, 21600), (21600, 10800)]:
+                r_fn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png"
+                if not os.path.exists(r_fn):
+                    # Create medium res mask image
+                    mimg = Image.fromarray(mask)
+                    if mimg.size != res:
+                        mimg = mimg.resize(res, Image.Resampling.LANCZOS)
+                    mimg.save(r_fn)
+                elif res_y == res[1]:
+                    image = Image.open(r_fn)
+                    mask = np.array(image)
+
+                # Use this mask resolution?
+                if res_y == res[1]:
+                    mask = np.array(mimg)
 
     else:
         # Use existing full mask image
@@ -1679,6 +1691,21 @@ def process_relief(overwrite=False, redownload=False):
     # print(cur_month, next_month)
     if not overwrite and cubemaps == 6:
         return  # Processed images present
+
+    """
+    Download pre-processed data from DATA_URL
+    """
+    try:
+        for f in ["F", "R", "B", "L", "U", "D"]:
+            tfn = f"{f}_relief_{settings.TEXRES}.png"
+            url = f"{settings.DATA_URL}relief/cubemap_{settings.TEXRES}/{tfn}"
+            download(url, pdir)
+        return
+    except (Exception) as e:
+        print(f"Error downloading: {str(e)} attempting to generate files")
+
+    # Below should never normally be executed as we now download from url above
+    # Code still required in case we need to regenerate the data from sources
 
     # Check for source images, download if not found
     colour_tex = "4_no_ice_clouds_mts_16k.jpg"
@@ -1761,6 +1788,26 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         and len(glob.glob(f"{pdir}/*_blue_marble_*_{settings.TEXRES}.png")) == 6 * 12
     ):
         return  # Full year processed images present
+
+    """
+    Download pre-processed data from DATA_URL
+    """
+    try:
+        for f in ["F", "R", "B", "L", "U", "D"]:
+            tfn = f"{f}_blue_marble_{month_name}_{settings.TEXRES}.png"
+            url = f"{settings.DATA_URL}bluemarble/cubemap_{settings.TEXRES}/{tfn}"
+            download(url, pdir)
+            tfn = f"{f}_blue_marble_{month_name2}_{settings.TEXRES}.png"
+            url = f"{settings.DATA_URL}bluemarble/cubemap_{settings.TEXRES}/{tfn}"
+            download(url, pdir)
+        for m in range(1, 13):
+            download(url, pdir)
+        return
+    except (Exception) as e:
+        print(f"Error downloading: {str(e)} attempting to generate files")
+
+    # Below should never normally be executed as we now download from url above
+    # Code still required in case we need to regenerate the data from sources
 
     # Check for source images, download if not found
     sdir = f"{settings.DATA_PATH}/bluemarble/source_tiled"
@@ -1851,7 +1898,7 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
                         tex.save(tfn)
 
 
-def process_gebco(overwrite=False, redownload=False):
+def process_gebco(cubemap, resolution, overwrite=False, redownload=False):
     """
     # Full res GEBCO .nc grid
 
@@ -1864,23 +1911,31 @@ def process_gebco(overwrite=False, redownload=False):
     - NC version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/
     - Sub-ice topo version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2023_sub_ice_topo/zip/
     """
-    subsampled = len(
-        glob.glob(f"{settings.DATA_PATH}/gebco/gebco_equirectangular_*_x_*")
-    )
-    cubemap = len(
-        glob.glob(f"{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}.npz")
-    )
-    if not overwrite and subsampled == 2 and cubemap == 1:
-        return  # Processed data exists
+    if cubemap:
+        fspec = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz"
+        if not overwrite and len(glob.glob(fspec)) == 1:
+            return  # Processed data exists
+    else:
+        fspec = f"{settings.DATA_PATH}/gebco/gebco_equirectangular_{resolution * 2}_x_{resolution}"
+        if not overwrite and len(glob.glob(fspec)) == 1:
+            return  # Processed data exists
 
     """
-    #Download from github releases
-    #TODO: create release and upload these files
-    #TODO2: move subsampling and export functions from GEBCO.ipynb to this module
-    url = f"https://github.com/ACCESS-NRI/visualisations/releases/download/v0.0.1/gebco_cubemap_{settings.GRIDRES}.npz"
-    raise(Exception("TODO: upload gebco cubemap data to github releases!"))
-    filename = utils.download(url, "./data/gebco")
+    Download pre-processed data from DATA_URL
     """
+    try:
+        if cubemap:
+            url = f"{settings.DATA_URL}gebco/gebco_cubemap_{resolution}.npz"
+        else:
+            url = f"{settings.DATA_URL}gebco/gebco_equirectangular_{resolution * 2}_x_{resolution}.npz"
+        ddir = f"{settings.DATA_PATH}/gebco"
+        download(url, ddir)
+        return
+    except (Exception) as e:
+        print(f"Error downloading: {str(e)} attempting to generate files")
+
+    # Below should never normally be executed as we now download from url above
+    # Code still required in case we need to regenerate the data from sources
 
     # Attempt to load full GEBCO
     if not os.path.exists(settings.GEBCO_PATH):
