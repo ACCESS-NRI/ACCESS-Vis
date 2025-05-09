@@ -5,6 +5,7 @@ import glob
 import gzip
 import math
 import os
+from collections import defaultdict
 from contextlib import closing
 from io import BytesIO
 from pathlib import Path
@@ -1271,6 +1272,34 @@ def normalise(vec):
     return vn
 
 
+def latlon_normal_vector(lat, lon):
+    """
+    If standing at (lat,lon), this unit vector points directly above.
+    """
+    return normalise(latlon_to_3D(lat=lat, lon=lon))
+
+
+def latlon_vector_to_east(lat, lon):
+    """
+    If standing at (lat,lon), this unit vector points east.
+    """
+    start = latlon_to_3D(lat=lat, lon=lon)
+    north = latlon_to_3D(lat=90, lon=0)
+    cross = np.cross(north, start)
+    if np.any(cross):  # if start != north
+        return normalise(cross)
+    return np.array([1, 0, 0])
+
+
+def latlon_vector_to_north(lat, lon):
+    """
+    If standing at (lat,lon), this unit vector points north.
+    """
+    start = latlon_to_3D(lat=lat, lon=lon)
+    east = latlon_vector_to_east(lat=lat, lon=lon)
+    return normalise(np.cross(start, east))
+
+
 def vector_align(v1, v2, lvformat=True):
     """
     Get a rotation quaterion to align vectors v1 with v2
@@ -1922,3 +1951,154 @@ def process_gebco(overwrite=False, redownload=False):
     else:
         heights = split_tex(height, settings.GRIDRES)
         np.savez_compressed(fn, **heights)
+
+
+def plot_vectors_xr(
+    lv,
+    xr_coordinates: list[dict],
+    u=None,
+    v=None,
+    w=None,
+    lat_name="lat",
+    lon_name="lon",
+    alt_name="alt",
+    rescale_alt=True,
+    alt_scale_factor=1.0,
+    label="xr_vectors",
+    **kwargs,
+):
+    """
+    Plots vectors the earth.
+
+    Parameters
+    ----------
+    lv:
+    xr_coordinates: list[dict]
+        Each element is a dict of coord_name:approx_coord_value.
+        It automatically uses the nearest coordinate values.
+    u: xr.DataArray
+        vector magnitude in the east direction
+    v: xr.DataArray
+        vector magnitude in the north direction
+    w: xr.DataArray
+        vector magnitude in the upwards direction
+    lat_name: str
+        The name of the latitude coordinate (e.g. lat, latitude)
+    lon_name: str
+        The name of the longitude coordinate (e.g. lon, longitude)
+    alt_name: str
+        The name of the altitude coordinate (e.g. alt, altitude)
+        If it cannot find match alt_name, altitude defaults 0.
+    rescale_alt: bool
+        If True, it re-scales the altitude to make it higher off the surface.
+        If False, it uses the provided altitude (or zero if missing).
+        If False, the altitude coordinate must be in meters above sea level.
+    alt_scale_factor: float
+        How far above the ground should the top-most arrow be?
+        Defaults to 1 (million meters).
+    label: str
+        The name of the lavavu vectors.
+        Change this if plotting multiple sets of vectors at the same time.
+    kwargs:
+        Lavavu vector properties, e.g. colour, scalevectors.
+        https://lavavu.github.io/Documentation/Property-Reference.html#object-vector
+
+    Returns
+    -------
+
+    lavavu.Object:
+        The object defining all the vectors in lavavu
+    """
+
+    vertices = []  # where the arrow base is
+    vectors = []  # direction the arrow is pointing
+
+    # Here we find all unique coordinates,
+    # then reducing the size of u,v,w to only these values.
+    # Then I load this DataArray Subset.
+    # Otherwise it takes too long to run.
+    coord_indexers = defaultdict(list)
+    for d in xr_coordinates:
+        for key, val in d.items():
+            coord_indexers[key].append(val)
+    coord_indexers = {key: np.unique(val) for key, val in coord_indexers.items()}
+
+    if u is not None:
+        u = u.sel(
+            method="nearest", indexers=coord_indexers
+        ).load()  # making u smaller and loading for speed
+        any_xr = u  # We pick any xarray dataset and use this to get lat/lon/alt later
+    if v is not None:
+        v = v.sel(method="nearest", indexers=coord_indexers).load()
+        any_xr = v
+    if w is not None:
+        w = w.sel(method="nearest", indexers=coord_indexers).load()
+        any_xr = w
+    if u is None and v is None and w is None:
+        raise ValueError("You must provide at least one of u,v,w.")
+
+    if rescale_alt and alt_name in any_xr.coords:
+        min_alt = np.min(any_xr[alt_name]).to_numpy()
+        max_alt = np.max(any_xr[alt_name]).to_numpy()
+    else:
+        min_alt = 0
+        max_alt = 1
+
+    # Looping through to get vertex/vector for each arrow.
+    for coords in xr_coordinates:
+        arr = any_xr.sel(method="nearest", **coords)
+        lat = arr[lat_name].to_numpy()
+        lon = arr[lon_name].to_numpy()
+        try:
+            alt = arr[alt_name].to_numpy()
+        except KeyError:
+            alt = 0
+
+        # Basis vector directions, on the 3d model.
+        normal = latlon_normal_vector(lat, lon)
+        east = latlon_vector_to_east(lat=lat, lon=lon)
+        north = latlon_vector_to_north(lat=lat, lon=lon)
+
+        if rescale_alt:
+            # The bottom-most vector is ground level, top-most is at a height of alt_scale_factor above ground
+            relative_height = (alt - min_alt) / (max_alt - min_alt)
+            vert = latlon_to_3D(lat, lon) + normal * relative_height * alt_scale_factor
+            vertices.append(vert)
+        else:
+            vert = latlon_to_3D(lat=lat, lon=lon, alt=alt * 1e-6)
+            # 1e-6 is to convert from meters to Million meters (3d Scale)
+            vertices.append(vert)
+
+        # If array is missing/is nan, we set the vector in that direction to 0.
+        if u is None:
+            uu = 0
+        else:
+            uu = np.nan_to_num(u.sel(method="nearest", **coords))
+        if v is None:
+            vv = 0
+        else:
+            vv = np.nan_to_num(v.sel(method="nearest", **coords))
+        if w is None:
+            ww = 0
+        else:
+            ww = np.nan_to_num(w.sel(method="nearest", **coords))
+        vec = east * uu + north * vv + normal * ww
+        vectors.append(vec)
+
+    # creating the vectors object if it does not exist.
+    try:
+        lv_vectors = lv.objects[label]
+        lv_vectors.clear()
+    except KeyError:
+        lv_vectors = lv.vectors(label, colour="red", lit=False)
+
+    for prop, val in kwargs.items():  # Vector settings (e.g. colour)
+        lv_vectors[prop] = val
+
+    # Plotting the vectors
+    lv_vectors.vertices(vertices)
+    lv_vectors.vectors(vectors)
+
+    lv.render()
+
+    return lv_vectors
