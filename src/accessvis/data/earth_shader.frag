@@ -28,6 +28,7 @@ uniform vec4 uViewport;
 
 //Custom 
 uniform float radius;
+uniform sampler2D landmask;
 uniform sampler2D wavetex;
 uniform sampler2D wavenormal;
 uniform sampler2D blendTex;
@@ -97,16 +98,15 @@ void main(void)
   if (any(lessThan(vVertex, uClipMin)) || any(greaterThan(vVertex, uClipMax))) discard;
 
   float alpha = 1.0; //fColour.a;
-float mask = 0.0;
-vec4 tColour = texture(uTexture, vTexCoord);
-mask = tColour.a;
+  vec4 tColour = texture(uTexture, vTexCoord);
+  float mask = texture(landmask, vTexCoord).r;
 
-if (blendFactor >= 0.0)
-{
-  //Blend between two textures
-  vec4 tColour2 = texture(blendTex, vTexCoord);
-  tColour = mix(tColour, tColour2, blendFactor);
-}
+  if (blendFactor >= 0.0)
+  {
+    //Blend between two textures
+    vec4 tColour2 = texture(blendTex, vTexCoord);
+    tColour = mix(tColour, tColour2, blendFactor);
+  }
 
   vec4 fColour = tColour;
 
@@ -137,7 +137,7 @@ if (blendFactor >= 0.0)
   //if ((fColour.z > 0.5 && fColour.x < 0.3 && fColour.y > 0.3)) // || (fColour.x * fColour.y * fColour.z > 0.25))
   
   //Ocean/land mask, baked into colour texture alpha channel
-  bool water = mask <= 0.7;
+  bool water = mask <= 0.5;
   //bool water = mask >= 0.85 && depth <= 1.0;
   //Water calc for shaded relief textures
   //bool water = (fColour.z > 0.5 && fColour.x < 0.3 && fColour.y > 0.3);
