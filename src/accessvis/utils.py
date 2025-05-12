@@ -115,6 +115,8 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
 
     # Establish connection
     r = requests.get(url, stream=True, headers=headers)
+    if r.status_code != 200:
+        raise (requests.HTTPError(f"Download error: {r.status_code} - {url}"))
 
     with open(filename, mode) as f:
         with tqdm(
@@ -184,6 +186,9 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
                         timeout=5,
                     )
 
+                    if r.status_code != 200:
+                        print(" Download error: ", url, r.status_code)
+                        return None
                     file_size_actual = int(r.headers.get("content-length", 0))
                     file_size = file.stat().st_size
 
@@ -203,9 +208,12 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
                     downloader(url, filename)
 
                 return filename
+            except requests.HTTPError as e:
+                print("HTTP Error, aborted", e)
+                raise
             except requests.ConnectTimeout:
                 print("Timeout, aborted")
-                break
+                raise
             except Exception as e:
                 print(f"Exception {e}, will retry")
                 pass
