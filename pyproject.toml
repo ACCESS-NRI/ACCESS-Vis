@@ -52,7 +52,7 @@ classifiers = [
 dependencies = [
   "lavavu",
   "pillow",
-  "py360convert",
+  "py360convert>=1.0.3",
   "matplotlib",
   "requests",
   "wget",
