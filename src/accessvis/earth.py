@@ -47,7 +47,7 @@ class Settings:
     TEXRES = 2048
     GRIDRES = 1024
     MAXGRIDRES = 4096
-    DATA_URL = "https://object-store.rc.nectar.org.au/v1/AUTH_fb4d732ddb7447d4beeaad299223d953/accessvis/"
+    DATA_URL = "https://object-store.rc.nectar.org.au/v1/AUTH_685340a8089a4923a71222ce93d5d323/accessvis"
 
     # INSTALL_PATH is used for files such as sea-water-normals.png
     INSTALL_PATH = Path(__file__).parents[0]
