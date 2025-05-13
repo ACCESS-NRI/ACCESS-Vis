@@ -997,6 +997,8 @@ def plot_earth(
         lv.rotation(0.0, 180.0, 0.0)
     elif hemisphere == "WE":
         lv.rotation(0.0, 0.0, 0.0)
+
+    lv.render()  # Required to apply changes
     return lv
 
 
