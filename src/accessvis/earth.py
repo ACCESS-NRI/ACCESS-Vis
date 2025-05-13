@@ -1901,12 +1901,11 @@ def process_landmask(texture, overwrite=False, redownload=False):
         # Load full water mask images for bluemarble
         for masktype in ["watermask", "oceanmask"]:
             # Calculate full image res to use for specified TEXRES
-            filespec = f"{settings.DATA_PATH}/landmask/world.{masktype}.*.png"
-            filespec_cube = (
+            filespec = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
+            filespec_cm = (
                 f"{settings.DATA_PATH}/landmask/cubemap_{res}/*_{masktype}_{res}.png"
             )
-            # filespec = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
-            if len(glob.glob(filespec)) < 3 or len(glob.glob(filespec_cube)) < 6:
+            if len(glob.glob(filespec)) < 1 or len(glob.glob(filespec_cm)) < 6:
                 """
                 Download pre-processed data from DATA_URL
                 """
