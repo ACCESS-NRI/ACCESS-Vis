@@ -766,6 +766,10 @@ def plot_region(
     sverts[::, ::, 0:2] = xy
     sverts[::, ::, 2] = height[::, ::]
 
+    # Default mask
+    mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
+    # mask_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
+
     if texture == "bluemarble":
         # TODO: support cropping tiled high res blue marble textures
         # Also download relief textures if not found or call process_bluemarble
@@ -774,15 +778,11 @@ def plot_region(
         uniforms["bluemarble"] = True
     elif texture == "relief":
         process_relief()  # Ensure images available
-        mask_tex = "{settings.DATA_PATH}/landmask/landmask_16200_8100.png"
         colour_tex = f"{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg"
     else:
         colour_tex = texture
 
     process_landmask(texture)
-    if not mask_tex:
-        mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
-    # mask_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
     lv.texture("landmask", mask_tex)
 
     surf = lv.triangles(
