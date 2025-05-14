@@ -201,12 +201,19 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
                 print(" Download error: ", url, r.status_code)
                 return None
             file_size_actual = int(r.headers.get("content-length", 0))
-            file_size = file.stat().st_size
+            file_size_local = file.stat().st_size
 
-            if file_size != file_size_actual:
+            if file_size_local != file_size_actual:
                 if not quiet:
-                    print(f"File {filename} is incomplete. Resume download.")
-                downloader(url, filename, attempts, file_size)
+                    print(
+                        f"File {filename} is incomplete. Resume download. {file_size_local} != {file_size_actual}"
+                    )
+                try:
+                    # Try to resume partial
+                    downloader(url, filename, attempts, file_size_local)
+                except requests.HTTPError:
+                    # Try the full download again
+                    downloader(url, filename, attempts)
             else:
                 if not quiet:
                     print(f"File {filename} is complete. Skip download.")
