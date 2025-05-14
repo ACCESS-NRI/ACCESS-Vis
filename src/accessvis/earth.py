@@ -1377,9 +1377,12 @@ def sun_light(
             from astropy.time import Time
 
             # Get local timezone
-            ltz = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+            ltime = datetime.datetime.now(datetime.timezone.utc).astimezone()
+            ltz = ltime.tzinfo
             if now or time is None:
-                time = datetime.datetime.now(tz=ltz)
+                # Use local time in utc zone
+                time = ltime
+                # time = datetime.datetime.now(tz=ltz)
 
             # Replace timezone?
             if tz:
