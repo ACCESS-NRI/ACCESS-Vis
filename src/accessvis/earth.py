@@ -1972,7 +1972,8 @@ def plot_vectors_xr(
 
     Parameters
     ----------
-    lv:
+    lv: lavavu.Viewer
+        The viewer object to plot with.
     xr_coordinates: list[dict]
         Each element is a dict of coord_name:approx_coord_value.
         It automatically uses the nearest coordinate values.
@@ -2102,3 +2103,75 @@ def plot_vectors_xr(
     lv.render()
 
     return lv_vectors
+
+
+def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
+    """
+    Uses a shapefile to display a boundary.
+
+    lv, fn, features=None, alt=0.1, label='shape_', **kwargs
+
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The viewer object to plot with.
+    fn: str
+        The path to the shapefile.
+    features: list[str]|str|None
+        Which shapefile shapes to display.
+        Multiple countries/states/regions may be in the same file. Select desired shapes.
+        str: only display this shape.
+        list[str]: display all shapes in the list.
+        None: display all shapes.
+        Note: it is case sensitive and will silently skip features it cannot find.
+        e.g. ["Australian Capital Territory", "Northern Territory"]
+    alt: float
+        The height above the earth that lines should hover (million meters).
+    label: str
+        The prefix of the name name of the lavavu lines.
+        Change this if plotting multiple regions with the same name.
+    kwargs:
+        Lavavu line properties, e.g. colour, linewidth.
+        https://lavavu.github.io/Documentation/Property-Reference.html#object-line
+
+    Returns
+    -------
+    dict[str, lavavu.Object]
+        key: the label of each lavavu object
+        value: The displayed lavavu object
+    """
+    import shapefile  # shapefile is an optional dependency.
+
+    sf = shapefile.Reader(fn)
+
+    objects = dict()
+
+    if isinstance(features, str):
+        features = [str]
+
+    # Iterating through each shape, e.g. each state
+    for entry, shape in zip(sf.iterShapeRecords(), sf.shapes()):
+        # finding name
+        if features is None:
+            name = label + str(entry.record[0])
+        else:
+            for rec in entry.record:
+                if features is None or str(rec) in features:
+                    name = label + str(rec)  # a name is found
+                    break
+            else:  # No name is found. Continue to next entry
+                continue
+
+        # converting to 3d Coordinates.
+        lons, lats = zip(*shape.points)
+        verts = latlon_to_3D(lat=lats, lon=lons, alt=alt).T
+
+        # Iterate through each part, e.g. each island.
+        for i, (p1, p2) in enumerate(zip(shape.parts[:-1], shape.parts[1:])):
+            vv = verts[p1:p2]
+            points = lv.lines(name + "_" + str(i), **kwargs, link=True, depthtest=True)
+            points.vertices(vv)
+
+            objects[name + "_" + str(i)] = points
+    lv.render()
+    return objects
