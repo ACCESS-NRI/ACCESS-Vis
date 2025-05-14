@@ -767,8 +767,8 @@ def plot_region(
     sverts[::, ::, 2] = height[::, ::]
 
     # Default mask
-    mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
-    # mask_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
+    # mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
+    mask_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
 
     if texture == "bluemarble":
         # TODO: support cropping tiled high res blue marble textures
