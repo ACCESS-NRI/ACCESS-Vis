@@ -1207,7 +1207,7 @@ def update_earth_texture(
             uniforms.update(kwargs)
             obj["uniforms"] = uniforms
 
-    lv.render()  # Required to render a frame which fixes texture glitch
+    # lv.render()  # Required to render a frame which fixes texture glitch
 
 
 def update_earth_values(lv, name="", flip=False, *args, **kwargs):
@@ -1227,7 +1227,7 @@ def update_earth_values(lv, name="", flip=False, *args, **kwargs):
             uniforms.update(kwargs)
             obj["uniforms"] = uniforms
 
-    lv.render()  # Required to render a frame which fixes texture glitch
+    # lv.render()  # Required to render a frame which fixes texture glitch
 
 
 def vec_rotate(v, theta, axis):
