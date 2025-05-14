@@ -1710,12 +1710,12 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         so need to check for both
     """
     midx = 0
-    month_name = ""
-    if when is not None:
-        midx = when.month
-        midx2 = midx + 1 if midx < 12 else 1
-        month_name = when.strftime("%B")
-        month_name2 = datetime.date(2004, midx2, 1).strftime("%B")
+    if when is None:
+        when = datetime.datetime.now()
+    midx = when.month
+    midx2 = midx + 1 if midx < 12 else 1
+    month_name = when.strftime("%B")
+    month_name2 = datetime.date(2004, midx2, 1).strftime("%B")
     # Check for processed imagery
     # print(midx,month_name,settings.TEXRES)
     pdir = f"{settings.DATA_PATH}/bluemarble/cubemap_{settings.TEXRES}"
