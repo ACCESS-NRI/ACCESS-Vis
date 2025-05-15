@@ -26,6 +26,7 @@ uniform int uFrame;
 uniform bool bathymetry = false;
 uniform float radius;
 uniform sampler2D uTexture;
+uniform sampler2D landmask;
 uniform sampler2D wavetex;
 
 #define PI 3.14159265
@@ -68,8 +69,8 @@ void main(void)
   if (vTexCoord.x > -1.0) //Null texcoord (-1,-1)
   {
     vColour = texture(uTexture, vTexCoord);
-    //Land/water mask is baked into alpha channel
-    float mask = vColour.a;
+    //Land/water mask is provided in another texture
+    float mask = texture(landmask, vTexCoord).r;
     water = mask < 1.0;
   }
 

@@ -4,6 +4,7 @@ from contextlib import closing
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter, Retry
 from tqdm import tqdm
 
 
@@ -78,7 +79,7 @@ class pushd:
 
 
 # https://gist.github.com/tobiasraabe/58adee67de619ce621464c1a6511d7d9
-def downloader(url: str, filename: str, resume_byte_pos: int = None):
+def downloader(url: str, filename: str, attempts: int = 5, resume_byte_pos: int = None):
     """Download url with possible resumption.
     Parameters
     ----------
@@ -86,6 +87,8 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
         URL to download
     filename: str
         Filename to save as
+    attempts: int
+        Number of retries
     resume_byte_pos: int
         Position of byte from where to resume the download
     """
@@ -95,8 +98,18 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
         "User-Agent": user_agent,
     }
 
+    retry_strategy = Retry(
+        total=attempts,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    http = requests.Session()
+    http.mount("https://", adapter)
+    http.mount("http://", adapter)
+
     # Get size of file
-    r = requests.head(url, headers=headers)
+    r = http.head(url, headers=headers, timeout=5)
     file_size = int(r.headers.get("content-length", 0))
 
     # Set configuration
@@ -113,8 +126,10 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
         filename = url.split("/")[-1]
     file = Path(filename)
 
-    # Establish connection
-    r = requests.get(url, stream=True, headers=headers)
+    # Establish connection with retry strategy
+    r = http.get(url, stream=True, headers=headers)
+    if r.status_code != 200:
+        raise (requests.HTTPError(f"Download error: {r.status_code} - {url}"))
 
     with open(filename, mode) as f:
         with tqdm(
@@ -132,7 +147,7 @@ def downloader(url: str, filename: str, resume_byte_pos: int = None):
                 pbar.update(len(chunk))
 
 
-def download(url, path=None, filename=None, overwrite=False, quiet=False, attempts=50):
+def download(url, path=None, filename=None, overwrite=False, quiet=False, attempts=5):
     """
     Download a file from an internet URL,
     Attempts to handle transmission errors and resume partial downloads correctly
@@ -150,7 +165,7 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
     quiet : bool
         Reduce printed text
     attempts : int
-        Number of attempts if exceptions occurr, default = 50
+        Number of attempts if exceptions occur, default = 5
 
     Returns
     -------
@@ -169,45 +184,46 @@ def download(url, path=None, filename=None, overwrite=False, quiet=False, attemp
     url = o.geturl()
 
     def try_download():
-        for a in range(attempts):
-            try:
-                if not overwrite and os.path.exists(filename):
-                    # Get header and file size
-                    # r = requests.head(url)
-                    # Use a fake user agent, as some websites disallow python/urllib
-                    user_agent = "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7"
-                    r = requests.head(
-                        url,
-                        headers={
-                            "User-Agent": user_agent,
-                        },
+        if not overwrite and os.path.exists(filename):
+            # Get header and file size
+            # r = requests.head(url)
+            # Use a fake user agent, as some websites disallow python/urllib
+            user_agent = "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7"
+            r = requests.head(
+                url,
+                headers={
+                    "User-Agent": user_agent,
+                },
+                timeout=5,
+            )
+
+            if r.status_code != 200:
+                print(" Download error: ", url, r.status_code)
+                return None
+            file_size_actual = int(r.headers.get("content-length", 0))
+            file_size_local = file.stat().st_size
+
+            if file_size_local != file_size_actual:
+                if not quiet:
+                    print(
+                        f"File {filename} is incomplete. Resume download. {file_size_local} != {file_size_actual}"
                     )
-
-                    file_size_actual = int(r.headers.get("content-length", 0))
-                    file_size = file.stat().st_size
-
-                    if file_size != file_size_actual:
-                        if not quiet:
-                            print(f"File {filename} is incomplete. Resume download.")
-                        downloader(url, filename, file_size)
-                    else:
-                        if not quiet:
-                            print(f"File {filename} is complete. Skip download.")
-                        return filename
-                else:
-                    if not quiet:
-                        print(
-                            f"File {filename} not found or overwrite set. Downloading."
-                        )
-                    downloader(url, filename)
-
+                try:
+                    # Try to resume partial
+                    downloader(url, filename, attempts, file_size_local)
+                except requests.HTTPError:
+                    # Try the full download again
+                    downloader(url, filename, attempts)
+            else:
+                if not quiet:
+                    print(f"File {filename} is complete. Skip download.")
                 return filename
+        else:
+            if not quiet:
+                print(f"File {filename} not found or overwrite set. Downloading.")
+            downloader(url, filename, attempts)
 
-            except Exception as e:
-                print(f"Exception {e}, will retry")
-                pass
-
-            print(f"Retry attempt {a}")
+        return filename
 
     if path is not None:
         with closing(pushd(path)):

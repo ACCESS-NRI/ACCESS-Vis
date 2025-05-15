@@ -48,6 +48,7 @@ class Settings:
     TEXRES = 2048
     GRIDRES = 1024
     MAXGRIDRES = 4096
+    DATA_URL = "https://object-store.rc.nectar.org.au/v1/AUTH_685340a8089a4923a71222ce93d5d323/accessvis"
 
     # INSTALL_PATH is used for files such as sea-water-normals.png
     INSTALL_PATH = Path(__file__).parents[0]
@@ -249,23 +250,29 @@ def lonlat_to_3D_true(lon, lat, alt=0, flattening=1.0 / 298.257223563):
     # return (x, y, z)
 
 
-def split_tex(data, res, flip=[]):
+def split_tex(data, res, flipud=False, fliplr=False):
     """
     Convert a texture image from equirectangular to a set of 6 cubemap faces
     (requires py360convert)
     """
+    if isinstance(flipud, bool):
+        # Can provide a list/string of faces to flip, or just a single bool to flip all
+        flipud = "FRBLUD" if flipud else ""
+    if isinstance(fliplr, bool):
+        fliplr = "FRBLUD" if fliplr else ""
     if len(data.shape) == 2:
         data = data.reshape(data.shape[0], data.shape[1], 1)
     channels = data.shape[2]
     # Convert equirectangular to cubemap
     out = py360convert.e2c(data, face_w=res, mode="bilinear", cube_format="dict")
     tiles = {}
-    for o in out:
-        # print(o, out[o].shape)
+    for i, o in enumerate(out):
+        print(o, out[o].shape, o in flipud, o in fliplr)
         tiles[o] = out[o].reshape(res, res, channels)
-        if True:  # o in flip:
+        if o in flipud:
             tiles[o] = np.flipud(tiles[o])
-            # tiles[o] = np.fliplr(tiles[o])
+        if o in fliplr:
+            tiles[o] = np.fliplr(tiles[o])
     return tiles
 
 
@@ -487,28 +494,40 @@ def cubemap_sphere_vertices(
     for f in ["F", "R", "B", "L", "U", "D"]:
         if f in cdata:
             verts = cdata[f]
+            tc = cdata[f + "_texcoord"]
         else:
+            # For texcoords
+            tij = np.linspace(0.0, 1.0, resolution, dtype="float32")
+            tii, tjj = np.meshgrid(tij, tij)  # 2d grid
+            # For vertices
             ij = np.linspace(-1.0, 1.0, resolution, dtype="float32")
             ii, jj = np.meshgrid(ij, ij)  # 2d grid
             zz = np.zeros(shape=ii.shape, dtype="float32")  # 3rd dim
             if f == "F":  ##
                 vertices = np.dstack((ii, jj, zz + 1.0))
+                tc = np.dstack((tii, tjj))
             elif f == "B":
                 vertices = np.dstack((ii, jj, zz - 1.0))
+                tc = np.dstack((1.0 - tii, tjj))
             elif f == "R":
                 vertices = np.dstack((zz + 1.0, jj, ii))
+                tc = np.dstack((1.0 - tii, tjj))
             elif f == "L":  ##
                 vertices = np.dstack((zz - 1.0, jj, ii))
+                tc = np.dstack((tii, tjj))
             elif f == "U":
                 vertices = np.dstack((ii, zz + 1.0, jj))
+                tc = np.dstack((tii, 1.0 - tjj))
             elif f == "D":  ##
                 vertices = np.dstack((ii, zz - 1.0, jj))
+                tc = np.dstack((tii, tjj))
             # Normalise the vectors to form spherical patch  (normalised cube)
             V = vertices.ravel().reshape((-1, 3))
             norms = np.sqrt(np.einsum("...i,...i", V, V))
             norms = norms.reshape(resolution, resolution, 1)
             verts = vertices / norms
             cdata[f] = verts.copy()
+            cdata[f + "_texcoord"] = tc
 
         # Scale and apply surface detail?
         if heightmaps:
@@ -519,6 +538,7 @@ def cubemap_sphere_vertices(
             # Apply radius only
             verts *= radius
         sdata[f] = verts
+        sdata[f + "_texcoord"] = tc
 
     # Save height range
     minmax = np.array(minmax)
@@ -530,30 +550,38 @@ def cubemap_sphere_vertices(
         del sdata["D"]  # Delete south
         for f in ["F", "R", "B", "L"]:
             sdata[f] = sdata[f][half::, ::, ::]  # Crop bottom section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][half::, ::, ::]
     elif hemisphere == "S":  # D
         del sdata["U"]  # Delete north
         for f in ["F", "R", "B", "L"]:
             sdata[f] = sdata[f][0:half, ::, ::]  # Crop top section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][0:half, ::, ::]
     elif hemisphere == "E":  # R
         del sdata["L"]  # Delete W
         for f in ["F", "B", "U", "D"]:
             sdata[f] = sdata[f][::, half::, ::]  # Crop left section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][::, half::, ::]
     elif hemisphere == "W":  # L
         del sdata["R"]  # Delete E
         for f in ["F", "B", "U", "D"]:
             sdata[f] = sdata[f][::, 0:half, ::]  # Crop right section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][::, 0:half, ::]
     elif hemisphere == "EW":  # B
         del sdata["F"]  # Delete prime meridian
         for f in ["R", "L"]:
             sdata[f] = sdata[f][::, 0:half, ::]  # Crop right section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][::, 0:half, ::]
         for f in ["U", "D"]:
             sdata[f] = sdata[f][0:half, ::, ::]  # Crop top section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][0:half, ::, ::]
     elif hemisphere == "WE":  # F
         del sdata["B"]  # Delete antimeridian
         for f in ["R", "L"]:
             sdata[f] = sdata[f][::, half::, ::]  # Crop left section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][::, half::, ::]
         for f in ["U", "D"]:
             sdata[f] = sdata[f][half::, ::, ::]  # Crop bottom section
+            sdata[f + "_texcoord"] = sdata[f + "_texcoord"][half::, ::, ::]
 
     # Save compressed un-scaled vertex data
     if cache:
@@ -593,7 +621,7 @@ def load_topography_cubemap(
     # Load detailed topo data
     if resolution is None:
         resolution = settings.GRIDRES
-    process_gebco()  # Ensure data exists
+    process_gebco(cubemap=True, resolution=resolution)  # Ensure data exists
     fn = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz"
     if not os.path.exists(fn):
         raise (Exception("GEBCO data not found"))
@@ -613,21 +641,8 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
     if resolution is None:
         resolution = settings.FULL_RES_Y
     heights = None
-    # Load medium-detail topo data
-    if resolution > 21600:
-        # Attempt to load full GEBCO
-        if not settings.GEBCO_PATH or not os.path.exists(settings.GEBCO_PATH):
-            resolution = 21600
-            print("Please pass path to GEBCO_2020.nc in settings.GEBCO_PATH")
-            print("https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/")
-            print(f"Dropping resolution to {resolution} in order to continue...")
-        else:
-            ds = xr.open_dataset(settings.GEBCO_PATH)
-            heights = ds["elevation"][::subsample, ::subsample].to_numpy()
-            heights = np.flipud(heights)
-
     if heights is None:
-        process_gebco()  # Ensure data exists
+        process_gebco(cubemap=False, resolution=resolution)  # Ensure data exists
         basefn = f"gebco_equirectangular_{resolution * 2}_x_{resolution}.npz"
         fn = f"{settings.DATA_PATH}/gebco/{basefn}"
         if not os.path.exists(fn):
@@ -752,18 +767,24 @@ def plot_region(
     sverts[::, ::, 0:2] = xy
     sverts[::, ::, 2] = height[::, ::]
 
+    # Default mask
+    # mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
+    mask_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
+
     if texture == "bluemarble":
         # TODO: support cropping tiled high res blue marble textures
         # Also download relief textures if not found or call process_bluemarble
-        # TODO2: write a process_relief function for splitting/downloading relief from Earth_Model.ipynb
-        # colour_tex = f"{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg"
+        process_bluemarble(when, blendtex=blendtex)
         colour_tex = f"{settings.DATA_PATH}/bluemarble/source_full/world.200412.3x21600x10800.jpg"
-        # colour_tex = f"{settings.DATA_PATH}/landmask/world.oceanmask.21600x10800.png"
         uniforms["bluemarble"] = True
     elif texture == "relief":
+        process_relief()  # Ensure images available
         colour_tex = f"{settings.DATA_PATH}/relief/4_no_ice_clouds_mts_16k.jpg"
     else:
         colour_tex = texture
+
+    process_landmask(texture)
+    lv.texture("landmask", mask_tex)
 
     surf = lv.triangles(
         name, vertices=sverts, uniforms=uniforms, cullface=True, opaque=True
@@ -871,14 +892,21 @@ def plot_earth(
     # Custom uniforms / additional textures
     uniforms["radius"] = radius
 
+    # Land/ocean mask - get data
+    process_landmask(texture)
+
     if texture == "bluemarble":
-        texture = "{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png"
+        texture = "{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.jpg"
         uniforms["bluemarble"] = True
         if waves is None:
             waves = True
+        # Use the bluemarble land/water mask
+        landmask = "{basedir}/landmask/cubemap_{texres}/{face}_watermask_{texres}.png"
     elif texture == "relief":
         process_relief()  # Ensure images available
-        texture = "{basedir}/relief/cubemap_{texres}/{face}_relief_{texres}.png"
+        texture = "{basedir}/relief/cubemap_{texres}/{face}_relief_{texres}.jpg"
+        # Use the relief land/water mask
+        landmask = "{basedir}/landmask/cubemap_{texres}/{face}_relief_{texres}.png"
 
     # Waves - load textures as shared
     lv.texture("wavetex", f"{settings.INSTALL_PATH}/data/sea-water-1024x1024_gs.png")
@@ -918,16 +946,21 @@ def plot_earth(
         if f not in topo:
             continue  # For hemisphere crops
         verts = topo[f]
+        tc = topo[f + "_texcoord"]
 
         texfn = texture.format(
             basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month
+        )
+        uniforms["landmask"] = landmask.format(
+            basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES
         )
 
         lv.triangles(
             name=f + name,
             vertices=verts,
+            texcoords=tc,
             texture=texfn,
-            fliptexture=False,
+            fliptexture=".jpg" in texfn,
             flip=f in ["F", "L", "D"],  # Reverse facing
             renderer="simpletriangles",
             opaque=True,
@@ -944,8 +977,6 @@ def plot_earth(
     # Default light props
     if lighting:
         lp = sun_light(time=when if sunlight else None, hour=hour, minute=minute)
-        # lv.set_properties(diffuse=0.5, ambient=0.5, specular=0.05, shininess=0.06, light=[1,1,0.98,1])
-        # lv.set_properties(diffuse=0.6, ambient=0.1, specular=0.0, shininess=0.01, light=[1,1,0.98,1])
         lv.set_properties(
             diffuse=0.6,
             ambient=0.6,
@@ -955,50 +986,20 @@ def plot_earth(
             lightpos=lp,
         )
 
-    # Hemisphere crop? Alter texcoords to fix half cubemap sections
-    def replace_texcoords(f, idx, lr):
-        obj = lv.objects[f + name]
-        el = np.copy(obj.data["texcoords"][0])
-        obj.cleardata("texcoords")
-        col = el[::, ::, idx]
-        if lr == "r":
-            el[::, ::, idx] = col * 0.5 + 0.5
-        elif lr == "l":
-            el[::, ::, idx] = col * 0.5
-        obj.texcoords(el)
-
-    if hemisphere is not None:
-        lv.render()  # Display/update
-
     if hemisphere == "N":
-        for f in ["F", "R", "B", "L"]:
-            replace_texcoords(f, 1, "r")
         lv.rotation(90.0, 0.0, 0.0)
     elif hemisphere == "S":
-        for f in ["F", "R", "B", "L"]:
-            replace_texcoords(f, 1, "l")
         lv.rotation(-90.0, 0.0, 0.0)
     elif hemisphere == "E":
-        for f in ["F", "B", "U", "D"]:
-            replace_texcoords(f, 0, "r")
         lv.rotation(0.0, -90.0, 0.0)
     elif hemisphere == "W":
-        for f in ["F", "B", "U", "D"]:
-            replace_texcoords(f, 0, "l")
         lv.rotation(0.0, 90.0, 0.0)
     elif hemisphere == "EW":
-        for f in ["R", "L"]:
-            replace_texcoords(f, 0, "l")
-        for f in ["U", "D"]:
-            replace_texcoords(f, 1, "l")
         lv.rotation(0.0, 180.0, 0.0)
     elif hemisphere == "WE":
-        for f in ["R", "L"]:
-            replace_texcoords(f, 0, "r")
-        for f in ["U", "D"]:
-            replace_texcoords(f, 1, "r")
         lv.rotation(0.0, 0.0, 0.0)
-    lv.reload()
+
+    lv.render()  # Required to apply changes
     return lv
 
 
@@ -1145,7 +1146,7 @@ def update_earth_datetime(
     factor = d / days
 
     if texture is None:
-        texture = "{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.png"
+        texture = "{basedir}/bluemarble/cubemap_{texres}/{face}_blue_marble_{month}_{texres}.jpg"
 
     if "bluemarble" in texture:
         # Check texture exists, if not download and process
@@ -1159,7 +1160,8 @@ def update_earth_datetime(
             basedir=settings.DATA_PATH, face=f, texres=settings.TEXRES, month=month2
         )
         assert os.path.exists(texfn)
-        assert os.path.exists(texfn2)
+        if blendtex:
+            assert os.path.exists(texfn2)
         o = f + name
         if o in lv.objects:
             obj = lv.objects[o]
@@ -1168,13 +1170,13 @@ def update_earth_datetime(
             # if not "blendTex" in uniforms or uniforms["blendTex"] != texfn2:
             if obj["texture"] != texfn:
                 obj["texture"] = texfn  # Not needed, but set so can be checked above
-                obj.texture(texfn, flip=False)
+                obj.texture(texfn, flip=".jpg" in texfn)
 
             if blendtex and (
                 "blendTex" not in uniforms or uniforms["blendTex"] != texfn2
             ):
                 uniforms["blendTex"] = texfn2
-                obj.texture(texfn2, flip=False, label="blendTex")
+                obj.texture(texfn2, flip=".jpg" in texfn2, label="blendTex")
 
             if not blendtex:
                 factor = -1.0  # Disable blending multiple textures
@@ -1206,7 +1208,7 @@ def update_earth_texture(
             uniforms.update(kwargs)
             obj["uniforms"] = uniforms
 
-    lv.render()  # Required to render a frame which fixes texture glitch
+    # lv.render()  # Required to render a frame which fixes texture glitch
 
 
 def update_earth_values(lv, name="", flip=False, *args, **kwargs):
@@ -1226,7 +1228,7 @@ def update_earth_values(lv, name="", flip=False, *args, **kwargs):
             uniforms.update(kwargs)
             obj["uniforms"] = uniforms
 
-    lv.render()  # Required to render a frame which fixes texture glitch
+    # lv.render()  # Required to render a frame which fixes texture glitch
 
 
 def vec_rotate(v, theta, axis):
@@ -1404,9 +1406,12 @@ def sun_light(
             from astropy.time import Time
 
             # Get local timezone
-            ltz = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+            ltime = datetime.datetime.now(datetime.timezone.utc).astimezone()
+            ltz = ltime.tzinfo
             if now or time is None:
-                time = datetime.datetime.now(tz=ltz)
+                # Use local time in utc zone
+                time = ltime
+                # time = datetime.datetime.now(tz=ltz)
 
             # Replace timezone?
             if tz:
@@ -1636,53 +1641,15 @@ def load_mask(res_y=None, masktype="watermask", subsample=1, cropbox=None):
     """
     if res_y is None:
         res_y = settings.FULL_RES_Y
-    # Get the tiled high res images
-    os.makedirs(settings.DATA_PATH / "landmask/source_tiled", exist_ok=True)
-    filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
-    if len(glob.glob(filespec)) < 8:
-        # Download tiles
-        for t in bm_tiles:
-            # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
-            url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
-            # print(url)
-            download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
 
     # Calculate full image res to use for specified TEXRES
-    ffn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
-    if not os.path.exists(ffn):
-        # Combine 4x2 image tiles into single image
-        # [A1][B1][C1][D1]
-        # [A2][B2][C2][D2]
-        mask = np.zeros(shape=(43200, 86400), dtype=np.uint8)
-        for t in bm_tiles:
-            x = ord(t[0]) - ord("A")
-            y = 1 if int(t[1]) == 2 else 0
-            filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
-            paste_image(filespec, x, y, mask)
-
-        # Save full mask in various resolutions
-        for res in [(86400, 43200), (43200, 21600), (21600, 10800)]:
-            r_fn = (
-                f"{settings.DATA_PATH}/landmask/world.{masktype}.{res[0]}x{res[1]}.png"
-            )
-            if not os.path.exists(r_fn):
-                # Create medium res mask image
-                mimg = Image.fromarray(mask)
-                if mimg.size != res:
-                    mimg = mimg.resize(res, Image.Resampling.LANCZOS)
-                mimg.save(r_fn)
-            elif res_y == res[1]:
-                image = Image.open(r_fn)
-                mask = np.array(image)
-
-            # Use this mask resolution?
-            if res_y == res[1]:
-                mask = np.array(mimg)
-
+    # (full equirectangular image - 'relief' or watermask/oceanmask for bluemarble
+    if masktype == "relief":
+        ffn = f"{settings.DATA_PATH}/landmask/landmask_16200_8100.png"
     else:
-        # Use existing full mask image
-        image = Image.open(ffn)
-        mask = np.array(image)
+        ffn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
+    image = Image.open(ffn)
+    mask = np.array(image)
 
     if subsample > 1:
         mask = mask[::subsample, ::subsample]
@@ -1700,14 +1667,34 @@ def process_relief(overwrite=False, redownload=False):
     redownload: bool
         Always download and overwrite source images, even if they exist
     """
+
+    if settings.TEXRES > 8192:
+        print("WARNING: 16K textures not available for relief mode")
+        settings.TEXRES = 8192
+
     # Check for processed imagery
     # print(midx,month_name,settings.TEXRES)
     pdir = f"{settings.DATA_PATH}/relief/cubemap_{settings.TEXRES}"
     os.makedirs(pdir, exist_ok=True)
-    cubemaps = len(glob.glob(f"{pdir}/*_relief_{settings.TEXRES}.png"))
+    cubemaps = len(glob.glob(f"{pdir}/*_relief_{settings.TEXRES}.jpg"))
     # print(cur_month, next_month)
     if not overwrite and cubemaps == 6:
         return  # Processed images present
+
+    """
+    Download pre-processed data from DATA_URL
+    """
+    try:
+        for f in ["F", "R", "B", "L", "U", "D"]:
+            tfn = f"{f}_relief_{settings.TEXRES}.jpg"
+            url = f"{settings.DATA_URL}/relief/cubemap_{settings.TEXRES}/{tfn}"
+            download(url, pdir)
+        return
+    except (Exception) as e:
+        print(f"Error downloading: {str(e)} attempting to generate files")
+
+    # Below should never normally be executed as we now download from url above
+    # Code still required in case we need to regenerate the data from sources
 
     # Check for source images, download if not found
     colour_tex = "4_no_ice_clouds_mts_16k.jpg"
@@ -1718,36 +1705,22 @@ def process_relief(overwrite=False, redownload=False):
         url = f"http://shadedrelief.com/natural3/ne3_data/16200/textures/{colour_tex}"
         download(url, sdir, overwrite=redownload)
 
-    water_mask = "water_16k.png"
-    if redownload or not os.path.exists(f"{sdir}/{water_mask}"):
-        url = f"http://shadedrelief.com/natural3/ne3_data/16200/masks/{water_mask}"
-        download(url, sdir, overwrite=redownload)
-
-    # Land water mask for relief map
-    water = np.array(Image.open(f"{sdir}/{water_mask}"))
-    # Renders a jpeg downsampled view
-    water = water.reshape(water.shape[0], water.shape[1], 1)
-
-    # 50% alpha over water/ocean areas
-    alphamask = 255 - water // 2
-
     # Open source image
-    col = np.array(Image.open(f"{sdir}/{colour_tex}"))
+    full = np.array(Image.open(f"{sdir}/{colour_tex}"))
 
-    # Split the colour texture image into cube map tiles, including water mask
+    # Split the colour texture image into cube map tiles
     # Export individial textures
     with closing(pushd(pdir)):
-        full = np.dstack((col, alphamask))
         textures = split_tex(full, settings.TEXRES)
         # Write colour texture tiles
         for f in ["F", "R", "B", "L", "U", "D"]:
-            tfn = f"{f}_relief_{settings.TEXRES}.png"
+            tfn = f"{f}_relief_{settings.TEXRES}.jpg"
             print(tfn)
             if overwrite or not os.path.exists(tfn):
                 # tex = lavavu.Image(data=textures[f])
                 # tex.save(tfn)
                 tex = Image.fromarray(textures[f])
-                tex.save(tfn)
+                tex.save(tfn, quality=95)
 
 
 def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=True):
@@ -1766,30 +1739,54 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
         so need to check for both
     """
     midx = 0
-    month_name = ""
-    if when is not None:
-        midx = when.month
-        midx2 = midx + 1 if midx < 12 else 1
-        month_name = when.strftime("%B")
-        month_name2 = datetime.date(2004, midx2, 1).strftime("%B")
+    if when is None:
+        when = datetime.datetime.now()
+    midx = when.month
+    midx2 = midx + 1 if midx < 12 else 1
+    month_name = when.strftime("%B")
+    month_name2 = datetime.date(2004, midx2, 1).strftime("%B")
     # Check for processed imagery
     # print(midx,month_name,settings.TEXRES)
     pdir = f"{settings.DATA_PATH}/bluemarble/cubemap_{settings.TEXRES}"
     os.makedirs(pdir, exist_ok=True)
     cur_month = len(
-        glob.glob(f"{pdir}/*_blue_marble_{month_name}_{settings.TEXRES}.png")
+        glob.glob(f"{pdir}/*_blue_marble_{month_name}_{settings.TEXRES}.jpg")
     )
     next_month = len(
-        glob.glob(f"{pdir}/*_blue_marble_{month_name2}_{settings.TEXRES}.png")
+        glob.glob(f"{pdir}/*_blue_marble_{month_name2}_{settings.TEXRES}.jpg")
     )
     # print(cur_month, next_month)
     if not overwrite and cur_month == 6 and (not blendtex or next_month == 6):
         return  # Full month processed images present
     if (
         not overwrite
-        and len(glob.glob(f"{pdir}/*_blue_marble_*_{settings.TEXRES}.png")) == 6 * 12
+        and len(glob.glob(f"{pdir}/*_blue_marble_*_{settings.TEXRES}.jpg")) == 6 * 12
     ):
         return  # Full year processed images present
+
+    """
+    Download pre-processed data from DATA_URL
+    """
+    try:
+        for f in ["F", "R", "B", "L", "U", "D"]:
+            tfn = f"{f}_blue_marble_{month_name}_{settings.TEXRES}.jpg"
+            url = f"{settings.DATA_URL}/bluemarble/cubemap_{settings.TEXRES}/{tfn}"
+            download(url, pdir)
+            tfn = f"{f}_blue_marble_{month_name2}_{settings.TEXRES}.jpg"
+            url = f"{settings.DATA_URL}/bluemarble/cubemap_{settings.TEXRES}/{tfn}"
+            download(url, pdir)
+
+        # Full equirectangular images, used for regional crops
+        ddir = f"{settings.DATA_PATH}/bluemarble/source_full"
+        for m in range(1, 13):
+            url = f"{settings.DATA_URL}/bluemarble/source_full/world.2004{m:02}.3x21600x10800.jpg"
+            download(url, ddir)
+        return
+    except (Exception) as e:
+        print(f"Error downloading: {str(e)} attempting to generate files")
+
+    # Below should never normally be executed as we now download from url above
+    # Code still required in case we need to regenerate the data from sources
 
     # Check for source images, download if not found
     sdir = f"{settings.DATA_PATH}/bluemarble/source_tiled"
@@ -1831,12 +1828,6 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
                 filename = download(url, sdir, overwrite=redownload)
                 print(filename)
 
-    # Load full water mask image
-    mask = load_mask()
-
-    # 50% alpha over water/ocean areas
-    alphamask = mask // 2 + 128
-
     # Split the colour texture image into cube map tiles
     full = np.zeros(shape=(43200, 86400, 3), dtype=np.uint8)
     for m in months:
@@ -1859,28 +1850,168 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
             )
             full = np.array(img)
 
-        # Set ocean to semi-transparent
-        full4 = np.dstack((full, alphamask))
-
         # Export individial textures
         if (
             overwrite
-            or len(glob.glob(f"{pdir}/*_blue_marble_{month}_{settings.TEXRES}.png"))
+            or len(glob.glob(f"{pdir}/*_blue_marble_{month}_{settings.TEXRES}.jpg"))
             != 6
         ):
             with closing(pushd(pdir)):
                 print(" - Splitting")
-                textures = split_tex(full4, settings.TEXRES)
+                textures = split_tex(full, settings.TEXRES)
                 # Write colour texture tiles
                 for f in ["F", "R", "B", "L", "U", "D"]:
-                    tfn = f"{f}_blue_marble_{month}_{settings.TEXRES}.png"
+                    tfn = f"{f}_blue_marble_{month}_{settings.TEXRES}.jpg"
                     print(" - ", tfn)
                     if overwrite or not os.path.exists(tfn):
-                        tex = lavavu.Image(data=textures[f])
-                        tex.save(tfn)
+                        # tex = lavavu.Image(data=textures[f])
+                        # tex.save(tfn)
+                        tex = Image.fromarray(textures[f])
+                        tex.save(tfn, quality=95)
 
 
-def process_gebco(overwrite=False, redownload=False):
+def process_landmask(texture, overwrite=False, redownload=False):
+    """
+    Download and process ocean/water mask imagery
+
+    overwrite: bool
+        Always re-process from source images overwriting any existing
+    redownload: bool
+        Always download and overwrite source images, even if they exist
+    """
+    res_y = settings.FULL_RES_Y
+    res = settings.TEXRES
+
+    # Load the relief mask
+    if texture == "relief":
+        if settings.TEXRES > 8192:
+            print("WARNING: 16K textures not available for relief mode")
+            res = settings.TEXRES = 8192
+
+        sdir = f"{settings.DATA_PATH}/landmask"
+        # Full equirectangular image
+        maskfn = f"{sdir}/landmask_16200_8100.png"
+        mask = None
+        if not os.path.exists(maskfn):
+            url = "http://shadedrelief.com/natural3/ne3_data/16200/masks/water_16k.png"
+            download(url, sdir, overwrite=redownload)
+
+            image = Image.open(f"{sdir}/water_16k.png")
+            mask = 255 - np.array(image)
+            # Save inverted image
+            mimg = Image.fromarray(mask)
+            mimg.save(maskfn)
+
+        filespec = f"{settings.DATA_PATH}/landmask/cubemap_{settings.TEXRES}/*_relief_{settings.TEXRES}.png"
+        if len(glob.glob(filespec)) < 6:
+            try:
+                # Cubemaps
+                for f in ["F", "R", "B", "L", "U", "D"]:
+                    url = f"{settings.DATA_URL}/landmask/cubemap_{res}/{f}_relief_{res}.png"
+                    download(url, f"{sdir}/cubemap_{res}")
+            except (Exception) as e:
+                print(f"Error downloading: {str(e)} attempting to generate files")
+
+                if mask is None:
+                    mask = np.array(Image.open(maskfn))
+
+                # Split the full res image into cube map tiles
+                pdir = f"{settings.DATA_PATH}/landmask/cubemap_{res}"
+                with closing(pushd(pdir)):
+                    textures = split_tex(mask, settings.TEXRES)
+                    # Write colour texture tiles
+                    for f in ["F", "R", "B", "L", "U", "D"]:
+                        tfn = f"{f}_relief_{res}.png"
+                        print(tfn)
+                        if overwrite or not os.path.exists(tfn):
+                            # tex = lavavu.Image(data=textures[f])
+                            # tex.save(tfn)
+                            tex = Image.fromarray(textures[f].squeeze())
+                            tex.save(tfn)
+
+    else:
+        # Load full water mask images for bluemarble
+        for masktype in ["watermask", "oceanmask"]:
+            # Calculate full image res to use for specified TEXRES
+            filespec = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
+            filespec_cm = (
+                f"{settings.DATA_PATH}/landmask/cubemap_{res}/*_{masktype}_{res}.png"
+            )
+            if len(glob.glob(filespec)) < 1 or len(glob.glob(filespec_cm)) < 6:
+                """
+                Download pre-processed data from DATA_URL
+                """
+                try:
+                    # Full iamges
+                    url = f"{settings.DATA_URL}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
+                    download(url, f"{settings.DATA_PATH}/landmask/")
+                    # Cubemaps
+                    for f in ["F", "R", "B", "L", "U", "D"]:
+                        url = f"{settings.DATA_URL}/landmask/cubemap_{res}/{f}_{masktype}_{res}.png"
+                        download(url, f"{settings.DATA_PATH}/landmask/cubemap_{res}")
+                    # All succeeded
+                    return
+
+                except (Exception) as e:
+                    print(f"Error downloading: {str(e)} attempting to generate files")
+
+                try:
+                    # Get the tiled high res images
+                    os.makedirs(
+                        settings.DATA_PATH / "landmask/source_tiled", exist_ok=True
+                    )
+                    filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.*.tif.gz"
+                    if len(glob.glob(filespec)) < 8:
+                        # Download tiles
+                        for t in bm_tiles:
+                            # https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73967/world.200402.3x21600x21600.A1.jpg
+                            # Original url, now using our own copy
+                            url = f"https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/world.{masktype}.21600x21600.{t}.tif.gz"
+                            # url = f"{settings.DATA_URL}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
+                            # print(url)
+                            download(url, f"{settings.DATA_PATH}/landmask/source_tiled")
+                except (Exception) as e:
+                    print(
+                        f"Error downloading source data: {str(e)}, unable to continue"
+                    )
+                    raise
+
+                # Combine 4x2 image tiles into single image
+                # [A1][B1][C1][D1]
+                # [A2][B2][C2][D2]
+                mask = np.zeros(shape=(43200, 86400), dtype=np.uint8)
+                for t in bm_tiles:
+                    x = ord(t[0]) - ord("A")
+                    y = 1 if int(t[1]) == 2 else 0
+                    filespec = f"{settings.DATA_PATH}/landmask/source_tiled/world.{masktype}.21600x21600.{t}.tif.gz"
+                    paste_image(filespec, x, y, mask)
+
+                # Split the full res image into cube map tiles
+                pdir = f"{settings.DATA_PATH}/landmask/cubemap_{res}"
+                with closing(pushd(pdir)):
+                    textures = split_tex(mask, settings.TEXRES)
+                    # Write colour texture tiles
+                    for f in ["F", "R", "B", "L", "U", "D"]:
+                        tfn = f"{f}_{masktype}_{res}.png"
+                        print(tfn)
+                        if overwrite or not os.path.exists(tfn):
+                            # tex = lavavu.Image(data=textures[f])
+                            # tex.save(tfn)
+                            tex = Image.fromarray(textures[f].squeeze())
+                            tex.save(tfn)
+
+                # Save full mask in various resolutions
+                for outres in [(86400, 43200), (43200, 21600), (21600, 10800)]:
+                    r_fn = f"{settings.DATA_PATH}/landmask/world.{masktype}.{outres[0]}x{outres[1]}.png"
+                    if not os.path.exists(r_fn):
+                        # Create medium res mask image
+                        mimg = Image.fromarray(mask)
+                        if mimg.size != outres:
+                            mimg = mimg.resize(outres, Image.Resampling.LANCZOS)
+                        mimg.save(r_fn)
+
+
+def process_gebco(cubemap, resolution, overwrite=False, redownload=False):
     """
     # Full res GEBCO .nc grid
 
@@ -1893,23 +2024,31 @@ def process_gebco(overwrite=False, redownload=False):
     - NC version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/
     - Sub-ice topo version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2023_sub_ice_topo/zip/
     """
-    subsampled = len(
-        glob.glob(f"{settings.DATA_PATH}/gebco/gebco_equirectangular_*_x_*")
-    )
-    cubemap = len(
-        glob.glob(f"{settings.DATA_PATH}/gebco/gebco_cubemap_{settings.GRIDRES}.npz")
-    )
-    if not overwrite and subsampled == 2 and cubemap == 1:
-        return  # Processed data exists
+    if cubemap:
+        fspec = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz"
+        if not overwrite and len(glob.glob(fspec)) == 1:
+            return  # Processed data exists
+    else:
+        fspec = f"{settings.DATA_PATH}/gebco/gebco_equirectangular_{resolution * 2}_x_{resolution}"
+        if not overwrite and len(glob.glob(fspec)) == 1:
+            return  # Processed data exists
 
     """
-    #Download from github releases
-    #TODO: create release and upload these files
-    #TODO2: move subsampling and export functions from GEBCO.ipynb to this module
-    url = f"https://github.com/ACCESS-NRI/visualisations/releases/download/v0.0.1/gebco_cubemap_{settings.GRIDRES}.npz"
-    raise(Exception("TODO: upload gebco cubemap data to github releases!"))
-    filename = utils.download(url, "./data/gebco")
+    Download pre-processed data from DATA_URL
     """
+    try:
+        if cubemap:
+            url = f"{settings.DATA_URL}/gebco/gebco_cubemap_{resolution}.npz"
+        else:
+            url = f"{settings.DATA_URL}/gebco/gebco_equirectangular_{resolution * 2}_x_{resolution}.npz"
+        ddir = f"{settings.DATA_PATH}/gebco"
+        download(url, ddir)
+        return
+    except (Exception) as e:
+        print(f"Error downloading: {str(e)} attempting to generate files")
+
+    # Below should never normally be executed as we now download from url above
+    # Code still required in case we need to regenerate the data from sources
 
     # Attempt to load full GEBCO
     if not os.path.exists(settings.GEBCO_PATH):
@@ -1949,7 +2088,7 @@ def process_gebco(overwrite=False, redownload=False):
     if os.path.exists(fn + ".npz"):
         heights = np.load(fn + ".npz")
     else:
-        heights = split_tex(height, settings.GRIDRES)
+        heights = split_tex(height, settings.GRIDRES, flipud=True)
         np.savez_compressed(fn, **heights)
 
 
