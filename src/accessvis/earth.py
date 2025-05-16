@@ -2319,7 +2319,6 @@ def plot_cross_section(
     data,
     start,
     end,
-    alt_range=(0, 1),
     resolution=100,
     label="cross-section",
     **kwargs,
@@ -2333,14 +2332,14 @@ def plot_cross_section(
         The viewer object to plot with.
     data: np.ndarray
         An array of shape [width, height, RGB(A)].
-        data[0,0] corrosponds to the starting point at the end of alt_range.
-        data[-1,-1] is the end point at the start of alt_range.
-    start: tuple[float, float]
-        (lat,lon) coordinates.
-    end: tuple[float, float]
-        (lat,lon) coordinates.
-    alt_range: tuple[float, float]
-        Altitude range in million meters.
+    start:
+        (lon, lat, altitude) or (lon, lat).
+        data[0,0] corrosponds to the start position.
+        Default altitude is 1 (million meters).
+    end: tuple[float, float, Optional[float]]
+        (lon, lat, altitude) or (lon, lat).
+        data[-1,-1] corrosponds to the end position.
+        Default altitude is 0 (million meters).
     resolution: int
         The number of mesh points between start and end.
         Increase if start/end cover a large range/if you see corners.
@@ -2359,11 +2358,21 @@ def plot_cross_section(
 
     surf = lv.triangles(label, colour="rgba(255,255,255,0)", **kwargs)
 
+    try:
+        max_alt = start[2]
+    except IndexError:
+        max_alt = 1
+
+    try:
+        min_alt = end[2]
+    except IndexError:
+        min_alt = 0
+
     # Calculating the position of all vertices.
-    lats = np.linspace(start[0], end[0], resolution)
-    lons = np.linspace(start[1], end[1], resolution)
-    lower = latlon_to_3D(lat=lats, lon=lons, alt=alt_range[0])
-    upper = latlon_to_3D(lat=lats, lon=lons, alt=alt_range[-1])
+    lats = np.linspace(start[1], end[1], resolution)
+    lons = np.linspace(start[0], end[0], resolution)
+    lower = latlon_to_3D(lat=lats, lon=lons, alt=min_alt)
+    upper = latlon_to_3D(lat=lats, lon=lons, alt=max_alt)
     vertices = np.dstack((lower, upper)).T
     surf.vertices(vertices)
 
