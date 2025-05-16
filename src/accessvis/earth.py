@@ -486,7 +486,11 @@ def cubemap_sphere_vertices(
     fn = f"{settings.DATA_PATH}/sphere/cube_sphere_{resolution}"
     if cache and os.path.exists(fn + ".npz"):
         cdata = np.load(fn + ".npz")
-        cache = False  # Don't need to write again
+        # Check for old data
+        if "F_texcoord" not in cdata:
+            cdata = {}  # Clear and re-write data
+        else:
+            cache = False  # Don't need to write again
     os.makedirs(settings.DATA_PATH / "sphere", exist_ok=True)
 
     # For each cube face...
@@ -1892,17 +1896,20 @@ def process_landmask(texture, overwrite=False, redownload=False):
         maskfn = f"{sdir}/landmask_16200_8100.png"
         mask = None
         if not os.path.exists(maskfn):
-            url = "http://shadedrelief.com/natural3/ne3_data/16200/masks/water_16k.png"
-            download(url, sdir, overwrite=redownload)
-
-            image = Image.open(f"{sdir}/water_16k.png")
-            mask = 255 - np.array(image)
-            # Save inverted image
-            mimg = Image.fromarray(mask)
-            mimg.save(maskfn)
+            url = f"{settings.DATA_URL}/landmask/landmask_16200_8100.png"
+            try:
+                download(url, sdir, overwrite=redownload)
+            except (Exception):
+                url = "http://shadedrelief.com/natural3/ne3_data/16200/masks/water_16k.png"
+                download(url, sdir, overwrite=redownload)
+                image = Image.open(f"{sdir}/water_16k.png")
+                mask = 255 - np.array(image)
+                # Save inverted image
+                mimg = Image.fromarray(mask)
+                mimg.save(maskfn)
 
         filespec = f"{settings.DATA_PATH}/landmask/cubemap_{settings.TEXRES}/*_relief_{settings.TEXRES}.png"
-        if len(glob.glob(filespec)) < 6:
+        if redownload or len(glob.glob(filespec)) < 6:
             try:
                 # Cubemaps
                 for f in ["F", "R", "B", "L", "U", "D"]:
@@ -1931,12 +1938,29 @@ def process_landmask(texture, overwrite=False, redownload=False):
     else:
         # Load full water mask images for bluemarble
         for masktype in ["watermask", "oceanmask"]:
+            # First check for old files (will be flipped in R,B,U tiles)
+            testfile = (
+                f"{settings.DATA_PATH}/landmask/cubemap_{res}/F_{masktype}_{res}.png"
+            )
+            outdated = False
+            if os.path.exists(testfile):
+                d0 = datetime.datetime.fromtimestamp(os.path.getmtime(testfile))
+                delta = datetime.datetime(2025, 5, 13) - d0
+                if delta.days > 0:
+                    print("Mask files out of date {delta.days} days, redownloading")
+                    outdated = True
+
             # Calculate full image res to use for specified TEXRES
             filespec = f"{settings.DATA_PATH}/landmask/world.{masktype}.{2 * res_y}x{res_y}.png"
             filespec_cm = (
                 f"{settings.DATA_PATH}/landmask/cubemap_{res}/*_{masktype}_{res}.png"
             )
-            if len(glob.glob(filespec)) < 1 or len(glob.glob(filespec_cm)) < 6:
+            if (
+                redownload
+                or outdated
+                or len(glob.glob(filespec)) < 1
+                or len(glob.glob(filespec_cm)) < 6
+            ):
                 """
                 Download pre-processed data from DATA_URL
                 """
@@ -1947,7 +1971,11 @@ def process_landmask(texture, overwrite=False, redownload=False):
                     # Cubemaps
                     for f in ["F", "R", "B", "L", "U", "D"]:
                         url = f"{settings.DATA_URL}/landmask/cubemap_{res}/{f}_{masktype}_{res}.png"
-                        download(url, f"{settings.DATA_PATH}/landmask/cubemap_{res}")
+                        download(
+                            url,
+                            f"{settings.DATA_PATH}/landmask/cubemap_{res}",
+                            overwrite=outdated,
+                        )
                     # All succeeded
                     return
 
