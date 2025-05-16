@@ -1578,7 +1578,6 @@ def array_to_rgba(
         # Opaque, Mask out NaN
         oarray = ~np.isnan(array) * 255
         rgba[::, ::, 3] = oarray.astype(np.uint8)
-        pass
 
     return rgba
 
