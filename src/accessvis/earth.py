@@ -2248,8 +2248,6 @@ def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
     """
     Uses a shapefile to display a boundary.
 
-    lv, fn, features=None, alt=0.1, label='shape_', **kwargs
-
     Parameters
     ----------
     lv: lavavu.Viewer
@@ -2267,7 +2265,7 @@ def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
     alt: float
         The height above the earth that lines should hover (million meters).
     label: str
-        The prefix of the name name of the lavavu lines.
+        The prefix of the name of the lavavu lines.
         Change this if plotting multiple regions with the same name.
     kwargs:
         Lavavu line properties, e.g. colour, linewidth.
@@ -2314,3 +2312,61 @@ def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
             objects[name + "_" + str(i)] = points
     lv.render()
     return objects
+
+
+def plot_cross_section(
+    lv,
+    data,
+    start,
+    end,
+    alt_range=(0, 1),
+    resolution=100,
+    label="cross-section",
+    **kwargs,
+):
+    """
+    Adds a vertical cross section of data.
+
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The viewer object to plot with.
+    data: np.ndarray
+        An array of shape [width, height, RGB(A)].
+        data[0,0] corrosponds to the starting point at the end of alt_range.
+        data[-1,-1] is the end point at the start of alt_range.
+    start: tuple[float, float]
+        (lat,lon) coordinates.
+    end: tuple[float, float]
+        (lat,lon) coordinates.
+    alt_range: tuple[float, float]
+        Altitude range in million meters.
+    resolution: int
+        The number of mesh points between start and end.
+        Increase if start/end cover a large range/if you see corners.
+    label: str
+        The name of the lavavu surface.
+        Change this if plotting multiple cross sections.
+    kwargs:
+        Lavavu surface properties, e.g. lit=False.
+        https://lavavu.github.io/Documentation/Property-Reference.html#object-surface
+
+    Returns
+    -------
+    lavavu.Object
+        The lavavu surface being created.
+    """
+
+    surf = lv.triangles(label, colour="rgba(255,255,255,0)", **kwargs)
+
+    # Calculating the position of all vertices.
+    lats = np.linspace(start[0], end[0], resolution)
+    lons = np.linspace(start[1], end[1], resolution)
+    lower = latlon_to_3D(lat=lats, lon=lons, alt=alt_range[0])
+    upper = latlon_to_3D(lat=lats, lon=lons, alt=alt_range[-1])
+    vertices = np.dstack((lower, upper)).T
+    surf.vertices(vertices)
+
+    surf.texture(data)
+    lv.reload()
+    return surf
