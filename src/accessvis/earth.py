@@ -2191,7 +2191,8 @@ def plot_vectors_xr(
         try:
             alt = arr[alt_name].to_numpy()
         except KeyError:
-            alt = 0
+            # If no altitude, the height is controlled by alt_scale_factor.
+            alt = max_alt
 
         # Basis vector directions, on the 3d model.
         normal = latlon_normal_vector(lat, lon)
