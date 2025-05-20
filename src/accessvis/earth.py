@@ -446,6 +446,8 @@ def cubemap_sphere_vertices(
     resolution=None,
     heightmaps=None,
     vertical_exaggeration=1.0,
+    topo_exaggeration=1,
+    bathy_exaggeration=1,
     cache=True,
     hemisphere=None,
 ):
@@ -466,6 +468,10 @@ def cubemap_sphere_vertices(
     vertical_exaggeration: float
         Multiplier to exaggerate the heightmap in the vertical axis,
         eg: to highlight details of topography and bathymetry
+    topo_exaggeration: number
+        Multiplier to topography height only
+    bathy_exaggeration: number
+        Multiplier to bathymetry height only
     cache: bool
         If true will attempt to load cached data and if not found will generate
         and save the data for next time
@@ -495,6 +501,7 @@ def cubemap_sphere_vertices(
 
     # For each cube face...
     minmax = []
+    eminmax = []
     for f in ["F", "R", "B", "L", "U", "D"]:
         if f in cdata:
             verts = cdata[f]
@@ -535,8 +542,37 @@ def cubemap_sphere_vertices(
 
         # Scale and apply surface detail?
         if heightmaps:
-            # Apply radius and heightmap
-            verts *= heightmaps[f] * vertical_exaggeration + radius
+            # Optional split vertical exaggeration for bathymetry and topography
+            if topo_exaggeration != 1 or bathy_exaggeration != 1:
+                # Load ocean mask for split topo/bathy exag
+                masktype = "oceanmask"
+                res = settings.TEXRES
+                mask_tile = f"{settings.DATA_PATH}/landmask/cubemap_{res}/{f}_{masktype}_{res}.png"
+                image = Image.open(mask_tile)
+                outres = (resolution, resolution)
+                if image.size != outres:
+                    image = image.resize(outres, Image.Resampling.LANCZOS)
+                mask = np.array(image)
+                if f != "U":
+                    mask = np.flipud(mask)
+                if f in ["R", "B"]:  # , 'U']:
+                    mask = np.fliplr(mask)
+                exag = np.zeros(shape=mask.shape, dtype=float)
+                exag += topo_exaggeration  # Set array to land exag
+                exag[mask == 0] = bathy_exaggeration  # Apply ocean exag with mask
+                # Apply radius and heightmap
+                hmap = (heightmaps[f].reshape(outres) * exag).reshape(
+                    (resolution, resolution, 1)
+                )
+                verts *= hmap + radius
+                eminmax += [hmap.min(), hmap.max()]
+            else:
+                # Apply radius and heightmap
+                verts *= heightmaps[f] * vertical_exaggeration + radius
+                eminmax += [
+                    heightmaps[f].min() * vertical_exaggeration,
+                    heightmaps[f].max() * vertical_exaggeration,
+                ]
             minmax += [heightmaps[f].min(), heightmaps[f].max()]
         else:
             # Apply radius only
@@ -546,7 +582,10 @@ def cubemap_sphere_vertices(
 
     # Save height range
     minmax = np.array(minmax)
+    eminmax = np.array(eminmax)
     sdata["range"] = (minmax.min(), minmax.max())
+    # Also exaggerated range
+    sdata["exag_range"] = (eminmax.min(), eminmax.max())
 
     # Hemisphere crop?
     half = resolution // 2
@@ -597,6 +636,8 @@ def load_topography_cubemap(
     resolution=None,
     radius=6.371,
     vertical_exaggeration=1,
+    topo_exaggeration=1,
+    bathy_exaggeration=1,
     bathymetry=True,
     hemisphere=None,
 ):
@@ -611,6 +652,10 @@ def load_topography_cubemap(
         Higher for more detailed surface features
     vertical_exaggeration: number
         Multiplier to topography/bathymetry height
+    topo_exaggeration: number
+        Multiplier to topography height only
+    bathy_exaggeration: number
+        Multiplier to bathymetry height only
     radius: float
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
     hemisphere: str
@@ -630,9 +675,16 @@ def load_topography_cubemap(
     if not os.path.exists(fn):
         raise (Exception("GEBCO data not found"))
     heights = np.load(fn)
+
     # Apply to cubemap sphere
     return cubemap_sphere_vertices(
-        radius, resolution, heights, vertical_exaggeration, hemisphere=hemisphere
+        radius,
+        resolution,
+        heights,
+        vertical_exaggeration,
+        topo_exaggeration,
+        bathy_exaggeration,
+        hemisphere=hemisphere,
     )
 
 
@@ -805,6 +857,8 @@ def plot_earth(
     lv=None,
     radius=6.371,
     vertical_exaggeration=10,
+    topo_exaggeration=1,
+    bathy_exaggeration=1,
     texture="bluemarble",
     lighting=True,
     when=None,
@@ -839,6 +893,10 @@ def plot_earth(
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
     vertical_exaggeration: number
         Multiplier to topography/bathymetry height
+    topo_exaggeration: number
+        Multiplier to topography height only
+    bathy_exaggeration: number
+        Multiplier to bathymetry height only
     texture: str
         Texture set to use, "bluemarble" for the 2004 NASA satellite data, "relief" for a basic relief map
         or provide a custom set of textures using a filename template with the following variables, only face is required
@@ -887,7 +945,12 @@ def plot_earth(
         )
 
     topo = load_topography_cubemap(
-        settings.GRIDRES, radius, vertical_exaggeration, hemisphere=hemisphere
+        settings.GRIDRES,
+        radius,
+        vertical_exaggeration,
+        topo_exaggeration,
+        bathy_exaggeration,
+        hemisphere=hemisphere,
     )
     if when is None:
         when = datetime.datetime.now()
@@ -925,7 +988,7 @@ def plot_earth(
     # Pass in height range of topography as this is dependent on vertical exaggeration
     # Convert metres to Mm and multiply by vertical exag
     # hrange = np.array([-10952, 8627]) * 1e-6 * vertical_exaggeration
-    hrange = np.array(topo["range"]) * vertical_exaggeration
+    hrange = np.array(topo["exag_range"])
     uniforms["heightmin"] = hrange[0]
     uniforms["heightmax"] = hrange[1]
 
