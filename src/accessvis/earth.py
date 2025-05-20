@@ -2330,8 +2330,6 @@ def plot_vectors_xr(
     lv_vectors.vertices(vertices)
     lv_vectors.vectors(vectors)
 
-    lv.render()
-
     return lv_vectors
 
 
@@ -2401,7 +2399,6 @@ def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
             points.vertices(vv)
 
             objects[name + "_" + str(i)] = points
-    lv.render()
     return objects
 
 
@@ -2459,6 +2456,10 @@ def plot_cross_section(
     except IndexError:
         min_alt = 0
 
+    # Support crossing zero in longitude
+    if start[0] > end[0]:
+        end[0] += 360
+
     # Calculating the position of all vertices.
     lats = np.linspace(start[1], end[1], resolution)
     lons = np.linspace(start[0], end[0], resolution)
@@ -2468,5 +2469,5 @@ def plot_cross_section(
     surf.vertices(vertices)
 
     surf.texture(data)
-    lv.reload()
+    # lv.reload() #Necessary?
     return surf
