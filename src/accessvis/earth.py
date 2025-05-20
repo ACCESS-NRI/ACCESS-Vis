@@ -2330,8 +2330,6 @@ def plot_vectors_xr(
     lv_vectors.vertices(vertices)
     lv_vectors.vectors(vectors)
 
-    lv.render()
-
     return lv_vectors
 
 
@@ -2401,7 +2399,6 @@ def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
             points.vertices(vv)
 
             objects[name + "_" + str(i)] = points
-    lv.render()
     return objects
 
 
@@ -2468,5 +2465,5 @@ def plot_cross_section(
     surf.vertices(vertices)
 
     surf.texture(data)
-    lv.reload()
+    # lv.reload() #Necessary?
     return surf
