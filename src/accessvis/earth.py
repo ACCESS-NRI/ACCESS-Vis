@@ -2456,6 +2456,10 @@ def plot_cross_section(
     except IndexError:
         min_alt = 0
 
+    # Support crossing zero in longitude
+    if start[0] > end[0]:
+        end[0] += 360
+
     # Calculating the position of all vertices.
     lats = np.linspace(start[1], end[1], resolution)
     lons = np.linspace(start[0], end[0], resolution)
