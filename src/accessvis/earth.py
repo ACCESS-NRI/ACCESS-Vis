@@ -243,7 +243,8 @@ def lonlat_to_3D_true(lon, lat, alt=0, flattening=1.0 / 298.257223563):
 
     x = (rad * C + alt) * cos_lat * np.cos(lon_r)
     y = (rad * C + alt) * cos_lat * np.sin(lon_r)
-    z = (rad * S + alt) * sin_lat
+    z = (rad * S + alt) * sin_lat * np.ones_like(lon_r)
+    # np.ones_like: if lon is array and lat is not, z is a const (shape != x,y)
 
     # Coord order swapped to match our coord system
     return np.array([y, z, x])
@@ -761,6 +762,8 @@ def plot_region(
     TODO: support using km as unit or other custom units instead with conversions from lat/lon
 
     TODO: FINISH DOCUMENTING PARAMS
+
+    Note: If you want to plot data in a region, but continue to display the entire earth, you may want to use plot_surface() instead.
 
     Parameters
     ----------
@@ -2466,8 +2469,65 @@ def plot_cross_section(
     lower = latlon_to_3D(lat=lats, lon=lons, alt=min_alt)
     upper = latlon_to_3D(lat=lats, lon=lons, alt=max_alt)
     vertices = np.dstack((lower, upper)).T
+
     surf.vertices(vertices)
 
     surf.texture(data)
     # lv.reload() #Necessary?
+    return surf
+
+
+def plot_surface(
+    lv, data, start, end, alt=0.1, resolution=10, label="data-surface", **kwargs
+):
+    """
+    Plots data on a region of the earth.
+
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The viewer object to plot with.
+    data: np.ndarray
+        An array of shape [width, height, RGB(A)].
+    start: tuple[number, number]
+        (lon, lat)
+        data[0,0] corrosponds to the start position.
+    end: tuple[number, number]
+        (lon, lat)
+        data[-1,-1] corrosponds to the end position.
+    alt: number
+        height above sea level to display the data.
+    resolution: int
+        The number of mesh points between start and end.
+        Increase if start/end cover a large range/if you see corners.
+    label: str
+        The name of the lavavu surface.
+        Change this if plotting multiple surfaces.
+    kwargs:
+        Lavavu surface properties, e.g. lit=False.
+        https://lavavu.github.io/Documentation/Property-Reference.html#object-surface
+
+    Note: For performance improvements, you may wish to use plot_region() instead of plot_earth(). Plot region uses fewer resources as it does not render the surface of the entire Earth.
+
+    Returns
+    -------
+    lavavu.Object
+        The lavavu surface being created.
+    """
+    surf = lv.triangles(
+        label, colour="rgba(255,255,255,0)", **kwargs  # allows transparent data
+    )
+
+    # Calculating the position of all vertices.
+    lats = np.linspace(start[1], end[1], resolution)
+    lons = np.linspace(start[0], end[0], resolution)
+
+    vertices = np.array(
+        [latlon_to_3D(lat=lat, lon=lons, alt=alt) for lat in lats]
+    ).transpose((0, 2, 1))
+    vertices = vertices[::-1, :, :]
+
+    surf.vertices(vertices)
+
+    surf.texture(data)
     return surf
