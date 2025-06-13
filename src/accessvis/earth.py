@@ -15,7 +15,7 @@ import numpy as np
 import py360convert
 import quaternion as quat
 import xarray as xr
-from PIL import Image
+from PIL import Image, ImageFile
 
 from .utils import download, is_notebook, pushd
 
@@ -345,8 +345,20 @@ def latlon_to_pixel(lat, lon, width, height):
 def crop_img_uv(img, cropbox):
     """
     Crop an image (PIL or numpy array) based on corner coords
-    Provide coords as texture coords in [0,1]
+
+    Parameters
+    ----------
+    img: np.ndarray or PIL.ImageFile.ImageFile
+        The image to be cropped (numpy or PIL).
+    cropbox:
+        Coordinates of the corners of the box to crop.
+        ((u0,v0), (u1,v1))
+        u0, u1, v0, v1 are typically in the range [0,1] but may be higher/lower.
+        If u0<0, we assume the image wraps around to the right side of img.
+        Likewise if u1>1 it wraps around the left side of img.
+        This is useful if you want a region of earth going over the 180/-180 line.
     """
+
     top_left, bottom_right = cropbox
     u0 = top_left[0]
     u1 = bottom_right[0]
@@ -357,21 +369,73 @@ def crop_img_uv(img, cropbox):
         u0, u1 = u1, u0
     if v0 > v1:
         v0, v1 = v1, v0
+
     # Supports numpy array or PIL image
     if isinstance(img, np.ndarray):
         # Assumes [lat][lon]
         lat = int(v0 * img.shape[0]), int(v1 * img.shape[0])
         lon = int(u0 * img.shape[1]), int(u1 * img.shape[1])
-        print(lat, lon)
-        return img[lat[0] : lat[1], lon[0] : lon[1]]
-    elif hasattr(img, "crop"):
-        area = (
-            int(u0 * img.size[0]),
-            int(v0 * img.size[1]),
-            int(u1 * img.size[0]),
-            int(v1 * img.size[1]),
+        pieces = []
+        if u0 < 0:  # wraps around the left side
+            underflow = int((1 + u0) * img.shape[1])
+            piece = img[lat[0] : lat[1], underflow:]
+            pieces.append(piece)
+
+        # in the 0..1 region
+        piece = img[lat[0] : lat[1], max(0, lon[0]) : lon[1]]
+        pieces.append(piece)
+
+        if u1 > 1:  # wraps around the right side
+            overflow = int((u1 - 1) * img.shape[1])
+            piece = img[lat[0] : lat[1], 0:overflow]
+            pieces.append(piece)
+
+        arr = np.hstack(pieces)
+
+        return arr
+
+    elif isinstance(img, ImageFile.ImageFile):
+        crop_regions = []
+        if u0 < 0:  # wraps around the left side
+            crop_regions.append(
+                (
+                    int((1 + u0) * img.size[0]),
+                    int(v0 * img.size[1]),
+                    int(img.size[0]),
+                    int(v1 * img.size[1]),
+                )
+            )
+        # in the 0..1 region
+        crop_regions.append(
+            (
+                int(max(0, u0) * img.size[0]),
+                int(v0 * img.size[1]),
+                int(min(1, u1) * img.size[0]),
+                int(v1 * img.size[1]),
+            )
         )
-        return img.crop(area)
+        if u1 > 1:  # wraps around the left side
+            crop_regions.append(
+                (
+                    0,
+                    int(v0 * img.size[1]),
+                    int((u1 - 1) * img.size[0]),
+                    int(v1 * img.size[1]),
+                )
+            )
+
+        max_height = crop_regions[0][3] - crop_regions[0][1]
+        total_width = sum(i[2] - i[0] for i in crop_regions)
+        new_im = Image.new("RGB", (total_width, max_height))
+
+        x_offset = 0
+        for area in crop_regions:
+            im = img.crop(area)
+            new_im.paste(im, (x_offset, 0))
+            x_offset += im.size[0]
+
+        return new_im
+
     else:
         print("Unknown type: ", type(img))
 
