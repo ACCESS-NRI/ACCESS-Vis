@@ -33,6 +33,7 @@ if gadi:
         os.environ["LV_CONTEXT"] = "moderngl"
 
 import lavavu  # noqa: E402
+from lavavu import tracers  # noqa: E402
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -2291,6 +2292,26 @@ def process_gebco(cubemap, resolution, overwrite=False, redownload=False):
     else:
         heights = split_tex(height, settings.GRIDRES, flipud=True)
         np.savez_compressed(fn, **heights)
+
+
+class EarthTracers(tracers.Tracers):
+    """
+    Override the tracer class get_positions to use 3D coords
+    Allow us to track particles and pass in data in lon,lat,alt but do
+    the final plotting in 3D cartesian coords
+
+    EarthTracers(grid, count=1000, lowerbound=None, upperbound=None, limit=None, age=4, respawn_chance=0.2, speed_multiply=1.0, height=0.0, label='', viewer=lv)
+    """
+
+    def get_positions(self):
+        lon = self.positions[::, 0]
+        lat = self.positions[::, 1]
+        if self.dims > 2:
+            alt = self.positions[::, 2]
+            positions = lonlat_to_3D(lon=lon, lat=lat, alt=alt).T
+        else:
+            positions = lonlat_to_3D(lon=lon, lat=lat, alt=self.height).T
+        return positions
 
 
 def plot_vectors_xr(
