@@ -1146,7 +1146,29 @@ def plot_earth(
     return lv
 
 
-def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
+def lonlat_grid(longitudes, latitudes, resolution=None):
+    """
+    Creates a 2D geo grid from  corner coords and a sampling resolution
+    Returns the longitude then latitude arrays
+
+    Parameters
+    ----------
+    longitudes: ndarray or tuple
+        min/max longitudes as a tuple
+    latitudes: ndarray or tuple
+        min/max latitudes as a tuple
+    resolution: 2-tuple
+        Resolution of the 2d grid: (longitude-res, latitude-res)
+
+    Returns
+    -------
+    tuple (ndarray,ndarray): the grid as lon,lat
+    """
+
+
+def lonlat_grid_3D(
+    longitudes, latitudes, altitude=0.001, resolution=None, wrap_longitude=False
+):
     """
     Creates a grid of 3D vertices representing a regional 2D grid converted from lat,lon coords
     Used for plotting data arrays on a 3D earth plot
@@ -1158,17 +1180,25 @@ def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
         List of longitude values or min/max longitude as a tuple
     latitudes: ndarray or tuple
         List of latitude values or min/max latitude as a tuple
-    altitudes: float
+    altitudes: float / ndarray
         height above sea level in Mm
         Will fill this value in a fixed height grid
+        If an array is passed, will use this as the height map
     resolution: 2-tuple
         Resolution of the 2d grid, if provided will use corner points from
         longitudes,latitudes only and sample a regular grid between them of
         provided resolution
+    wrap_longitude: boolean
+        If the grid requires an extra coord to wraps the earth in longitude
+        coords then set this to True.
+        This will add a duplicate of the first longitude value as the last
+        value. Useful for cell centred grids allowing passing original coord
+        range, without this a manually calculated additional coord might not
+        interpolate correctly on the grid.
 
     Returns
     -------
-    ndarray: the 3D vertices of the 2D grid
+    ndarray: the 3D vertices of the grid
     """
 
     x = np.array(longitudes)
@@ -1178,7 +1208,12 @@ def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
         x = np.linspace(x[0], x[-1], resolution[0])
         y = np.linspace(y[0], y[-1], resolution[1])
 
-    lon, lat = np.meshgrid(x, y, indexing="ij")  # X,Y,Z
+    if wrap_longitude:
+        # Joining longitude coord to wrap when using cell centre grid
+        x[-1] = x[0]  # + 360
+        # x = np.append(x, x[0])
+
+    lon, lat = np.meshgrid(x, y, indexing="ij")
 
     arrays = lonlat_to_3D(lon, lat, altitude)
 
@@ -2555,7 +2590,9 @@ def plot_surface(
 ):
     """
     Plots data on a region of the earth.
-    (TODO: this is regional version of earth_2d_plot, need to formalise naming for functions in regional/earth mode)
+
+    TODO: This should be regional version of earth_2d_plot, need to formalise naming for functions in regional/earth mode)
+    Currently it seems to do the same as earth_2d_plot?
 
     Parameters
     ----------
