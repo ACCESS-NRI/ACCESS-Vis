@@ -2046,7 +2046,7 @@ def process_landmask(texture, overwrite=False, redownload=False):
                 d0 = datetime.datetime.fromtimestamp(os.path.getmtime(testfile))
                 delta = datetime.datetime(2025, 5, 13) - d0
                 if delta.days > 0:
-                    print("Mask files out of date {delta.days} days, redownloading")
+                    print(f"Mask files out of date {delta.days} days, redownloading")
                     outdated = True
 
             # Calculate full image res to use for specified TEXRES
