@@ -31,11 +31,11 @@ jobs:
         uses: szenius/set-timezone@v2.0
         with:
           timezoneLinux: "Australia/Melbourne"
-      - name: Set up linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libosmesa6 libosmesa6-dev libglapi-mesa mesa-common-dev libglx-mesa0 libgl1-mesa-dri libgl-dev libglx-dev libgl1 libglx0 libglvnd0
+      #- name: Set up linux dependencies
+      #  if: runner.os == 'Linux'
+      #  run: |
+      #    sudo apt-get update -y
+      #    sudo apt-get install -y libosmesa6 libosmesa6-dev libglapi-mesa mesa-common-dev libglx-mesa0 libgl1-mesa-dri libgl-dev libglx-dev libgl1 libglx0 libglvnd0
       - name: Build/install
         run: python -m pip install .
       - name: Run headless test
