@@ -825,7 +825,9 @@ def plot_region(
     Uses lat/lon as coordinate system, so no use for polar regions, scales heights to equivalent
     TODO: support using km as unit or other custom units instead with conversions from lat/lon
 
-    TODO: FINISH DOCUMENTING PARAMS
+    TODO: FIX LAT/LON ordering - we are using lon/lat in all interfaces from now on
+    TODO: cropbox: defaults to full earth if None passed, write a test for this
+    FINISH DOCUMENTING PARAMS
 
     Note: If you want to plot data in a region, but continue to display the entire earth, you may want to use plot_surface() instead.
 
@@ -884,11 +886,14 @@ def plot_region(
 
     D = [height.shape[1], height.shape[0]]
     sverts = np.zeros(shape=(height.shape[0], height.shape[1], 3))
-    lat0, lon0 = cropbox[0]
-    lat1, lon1 = cropbox[1]
+    lat0, lon0 = cropbox[0] if cropbox else [-90, 0]
+    lat1, lon1 = cropbox[1] if cropbox else [90, 360]
+    # TODO: Support crossing zero in longitude
+    # Will probably not support crossing poles
     xy = lv.grid2d(corners=((lon0, lat1), (lon1, lat0)), dims=D)
     sverts[::, ::, 0:2] = xy
     sverts[::, ::, 2] = height[::, ::]
+    assert len(sverts)
 
     # Default mask
     # mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
@@ -914,8 +919,12 @@ def plot_region(
     )  # , fliptexture=False)
 
     img = Image.open(colour_tex)
-    cropped_img = crop_img_lat_lon(img, cropbox)
-    arr = np.array(cropped_img)
+    if cropbox:
+        cropped_img = crop_img_lat_lon(img, cropbox)
+        arr = np.array(cropped_img)
+    else:
+        arr = np.array(img)
+
     surf.texture(arr, flip=False)
     return lv
 
