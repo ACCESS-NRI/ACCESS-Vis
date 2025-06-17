@@ -247,8 +247,39 @@ def lonlat_to_3D_true(lon, lat, alt=0, flattening=1.0 / 298.257223563):
     # np.ones_like: if lon is array and lat is not, z is a const (shape != x,y)
 
     # Coord order swapped to match our coord system
+    # NOTE: will need to call np.dstack on result
+    # if passing in arrays and want result as 3d vertices
     return np.array([y, z, x])
-    # return (x, y, z)
+
+
+def earth_vertices_to_3D(vertices, true_earth=False):
+    """
+    Convert lon/lat/alt coords to 3D coordinates for visualisation
+
+    Same as calling lonlat_to_3D but takes and returns an array of 3d coordinates
+    instead of separate arrays for each coord
+
+    Parameters
+    ----------
+    vertices: ndarray
+        Coord vertices in order lon,lat,alt
+    true_earth: boolean
+        Pass true to apply flattening factor for WGS84 elliptical earth shape
+        Default is to use a perfect spherical earth
+    Returns
+    -------
+    np.ndarray
+        Vertices as 3D cartesian coords
+    """
+    shape = vertices.shape
+    vertices = vertices.reshape((-1, 3))
+    if true_earth:
+        arr = np.dstack(
+            lonlat_to_3D_true(vertices[::, 0], vertices[::, 1], vertices[::, 2])
+        )
+    else:
+        arr = np.dstack(lonlat_to_3D(vertices[::, 0], vertices[::, 1], vertices[::, 2]))
+    return np.dstack(arr).reshape(shape)
 
 
 def split_tex(data, res, flipud=False, fliplr=False):
@@ -2515,6 +2546,7 @@ def plot_surface(
 ):
     """
     Plots data on a region of the earth.
+    (TODO: this is regional version of earth_2d_plot, need to formalise naming for functions in regional/earth mode)
 
     Parameters
     ----------
