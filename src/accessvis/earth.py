@@ -450,7 +450,7 @@ def crop_img_lat_lon(img, cropbox):
     return crop_img_uv(img, (a, b))
 
 
-def sphere_mesh(radius=1.0, quality=256, cache=True):
+def sphere_mesh(radius=1.0, quality=256):
     """
     Generate a simple spherical mesh, not suitable for plotting accurate texture/data at the
     poles as there will be visible pinching artifacts,
@@ -462,47 +462,36 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
         Radius of the sphere
     quality: int
         Sphere mesh quality (higher = more triangles)
-    cache: bool
-        If true will attempt to load cached data and if not found will generate
-        and save the data for next time
-
     """
     # Generate cube face grid
-    fn = f"Sphere_{quality}_{radius:.4f}"
-    if cache and os.path.exists(fn + ".npz"):
-        sdata = np.load(fn + ".npz")
-    else:
-        lv = lavavu.Viewer()
-        tris0 = lv.spheres(
-            "sphere",
-            scaling=radius,
-            segments=quality,
-            colour="grey",
-            vertices=[0, 0, 0],
-            fliptexture=False,
-        )
-        tris0["rotate"] = [
-            0,
-            -90,
-            0,
-        ]  # This rotates the sphere coords to align with [0,360] longitude texture
-        tris0[
-            "texture"
-        ] = "data/blank.png"  # Need an initial texture or texcoords will not be generated
-        tris0["renderer"] = "sortedtriangles"
-        lv.render()
+    lv = lavavu.Viewer()
+    tris0 = lv.spheres(
+        "sphere",
+        scaling=radius,
+        segments=quality,
+        colour="grey",
+        vertices=[0, 0, 0],
+        fliptexture=False,
+    )
+    tris0["rotate"] = [
+        0,
+        -90,
+        0,
+    ]  # This rotates the sphere coords to align with [0,360] longitude texture
+    tris0[
+        "texture"
+    ] = "data/blank.png"  # Need an initial texture or texcoords will not be generated
+    tris0["renderer"] = "sortedtriangles"
+    lv.render()
 
-        # Generate and extract sphere vertices, texcoords etc
-        lv.bake()  # 1)
-        sdata = {}
-        element = tris0.data[0]
-        keys = element.available.keys()
-        for k in keys:
-            sdata[k] = tris0.data[k + "_copy"][0]
+    # Generate and extract sphere vertices, texcoords etc
+    lv.bake()  # 1)
+    sdata = {}
+    element = tris0.data[0]
+    keys = element.available.keys()
+    for k in keys:
+        sdata[k] = tris0.data[k + "_copy"][0]
 
-    # Save compressed vertex data
-    if cache:
-        np.savez_compressed(fn, **sdata)
     return sdata
 
 
@@ -513,7 +502,6 @@ def cubemap_sphere_vertices(
     vertical_exaggeration=1.0,
     topo_exaggeration=1,
     bathy_exaggeration=1,
-    cache=True,
     hemisphere=None,
 ):
     """
@@ -537,9 +525,6 @@ def cubemap_sphere_vertices(
         Multiplier to topography height only
     bathy_exaggeration: number
         Multiplier to bathymetry height only
-    cache: bool
-        If true will attempt to load cached data and if not found will generate
-        and save the data for next time
     hemisphere: str
         Crop the data to show a single hemisphere
         "N" = North polar
@@ -553,57 +538,41 @@ def cubemap_sphere_vertices(
         resolution = settings.GRIDRES
     # Generate cube face grid
     sdata = {}
-    cdata = {}
-    fn = f"{settings.DATA_PATH}/sphere/cube_sphere_{resolution}"
-    if cache and os.path.exists(fn + ".npz"):
-        cdata = np.load(fn + ".npz")
-        # Check for old data
-        if "F_texcoord" not in cdata:
-            cdata = {}  # Clear and re-write data
-        else:
-            cache = False  # Don't need to write again
-    os.makedirs(settings.DATA_PATH / "sphere", exist_ok=True)
 
     # For each cube face...
     minmax = []
     eminmax = []
     for f in ["F", "R", "B", "L", "U", "D"]:
-        if f in cdata:
-            verts = cdata[f]
-            tc = cdata[f + "_texcoord"]
-        else:
-            # For texcoords
-            tij = np.linspace(0.0, 1.0, resolution, dtype="float32")
-            tii, tjj = np.meshgrid(tij, tij)  # 2d grid
-            # For vertices
-            ij = np.linspace(-1.0, 1.0, resolution, dtype="float32")
-            ii, jj = np.meshgrid(ij, ij)  # 2d grid
-            zz = np.zeros(shape=ii.shape, dtype="float32")  # 3rd dim
-            if f == "F":  ##
-                vertices = np.dstack((ii, jj, zz + 1.0))
-                tc = np.dstack((tii, tjj))
-            elif f == "B":
-                vertices = np.dstack((ii, jj, zz - 1.0))
-                tc = np.dstack((1.0 - tii, tjj))
-            elif f == "R":
-                vertices = np.dstack((zz + 1.0, jj, ii))
-                tc = np.dstack((1.0 - tii, tjj))
-            elif f == "L":  ##
-                vertices = np.dstack((zz - 1.0, jj, ii))
-                tc = np.dstack((tii, tjj))
-            elif f == "U":
-                vertices = np.dstack((ii, zz + 1.0, jj))
-                tc = np.dstack((tii, 1.0 - tjj))
-            elif f == "D":  ##
-                vertices = np.dstack((ii, zz - 1.0, jj))
-                tc = np.dstack((tii, tjj))
-            # Normalise the vectors to form spherical patch  (normalised cube)
-            V = vertices.ravel().reshape((-1, 3))
-            norms = np.sqrt(np.einsum("...i,...i", V, V))
-            norms = norms.reshape(resolution, resolution, 1)
-            verts = vertices / norms
-            cdata[f] = verts.copy()
-            cdata[f + "_texcoord"] = tc
+        # For texcoords
+        tij = np.linspace(0.0, 1.0, resolution, dtype="float32")
+        tii, tjj = np.meshgrid(tij, tij)  # 2d grid
+        # For vertices
+        ij = np.linspace(-1.0, 1.0, resolution, dtype="float32")
+        ii, jj = np.meshgrid(ij, ij)  # 2d grid
+        zz = np.zeros(shape=ii.shape, dtype="float32")  # 3rd dim
+        if f == "F":  ##
+            vertices = np.dstack((ii, jj, zz + 1.0))
+            tc = np.dstack((tii, tjj))
+        elif f == "B":
+            vertices = np.dstack((ii, jj, zz - 1.0))
+            tc = np.dstack((1.0 - tii, tjj))
+        elif f == "R":
+            vertices = np.dstack((zz + 1.0, jj, ii))
+            tc = np.dstack((1.0 - tii, tjj))
+        elif f == "L":  ##
+            vertices = np.dstack((zz - 1.0, jj, ii))
+            tc = np.dstack((tii, tjj))
+        elif f == "U":
+            vertices = np.dstack((ii, zz + 1.0, jj))
+            tc = np.dstack((tii, 1.0 - tjj))
+        elif f == "D":  ##
+            vertices = np.dstack((ii, zz - 1.0, jj))
+            tc = np.dstack((tii, tjj))
+        # Normalise the vectors to form spherical patch  (normalised cube)
+        V = vertices.ravel().reshape((-1, 3))
+        norms = np.sqrt(np.einsum("...i,...i", V, V))
+        norms = norms.reshape(resolution, resolution, 1)
+        verts = vertices / norms
 
         # Scale and apply surface detail?
         if heightmaps:
@@ -646,6 +615,9 @@ def cubemap_sphere_vertices(
         sdata[f + "_texcoord"] = tc
 
     # Save height range
+    if len(minmax) == 0:
+        minmax = [0, vertical_exaggeration]
+        eminmax = [0, 1.0]
     minmax = np.array(minmax)
     eminmax = np.array(eminmax)
     sdata["range"] = (minmax.min(), minmax.max())
@@ -691,9 +663,6 @@ def cubemap_sphere_vertices(
             sdata[f] = sdata[f][half::, ::, ::]  # Crop bottom section
             sdata[f + "_texcoord"] = sdata[f + "_texcoord"][half::, ::, ::]
 
-    # Save compressed un-scaled vertex data
-    if cache:
-        np.savez_compressed(fn, **cdata)
     return sdata
 
 
