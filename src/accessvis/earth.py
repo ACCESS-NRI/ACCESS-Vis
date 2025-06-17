@@ -33,6 +33,7 @@ if gadi:
         os.environ["LV_CONTEXT"] = "moderngl"
 
 import lavavu  # noqa: E402
+from lavavu import tracers  # noqa: E402
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -247,8 +248,39 @@ def lonlat_to_3D_true(lon, lat, alt=0, flattening=1.0 / 298.257223563):
     # np.ones_like: if lon is array and lat is not, z is a const (shape != x,y)
 
     # Coord order swapped to match our coord system
+    # NOTE: will need to call np.dstack on result
+    # if passing in arrays and want result as 3d vertices
     return np.array([y, z, x])
-    # return (x, y, z)
+
+
+def earth_vertices_to_3D(vertices, true_earth=False):
+    """
+    Convert lon/lat/alt coords to 3D coordinates for visualisation
+
+    Same as calling lonlat_to_3D but takes and returns an array of 3d coordinates
+    instead of separate arrays for each coord
+
+    Parameters
+    ----------
+    vertices: ndarray
+        Coord vertices in order lon,lat,alt
+    true_earth: boolean
+        Pass true to apply flattening factor for WGS84 elliptical earth shape
+        Default is to use a perfect spherical earth
+    Returns
+    -------
+    np.ndarray
+        Vertices as 3D cartesian coords
+    """
+    shape = vertices.shape
+    vertices = vertices.reshape((-1, 3))
+    if true_earth:
+        arr = np.dstack(
+            lonlat_to_3D_true(vertices[::, 0], vertices[::, 1], vertices[::, 2])
+        )
+    else:
+        arr = np.dstack(lonlat_to_3D(vertices[::, 0], vertices[::, 1], vertices[::, 2]))
+    return np.dstack(arr).reshape(shape)
 
 
 def split_tex(data, res, flipud=False, fliplr=False):
@@ -450,7 +482,7 @@ def crop_img_lat_lon(img, cropbox):
     return crop_img_uv(img, (a, b))
 
 
-def sphere_mesh(radius=1.0, quality=256, cache=True):
+def sphere_mesh(radius=1.0, quality=256):
     """
     Generate a simple spherical mesh, not suitable for plotting accurate texture/data at the
     poles as there will be visible pinching artifacts,
@@ -462,47 +494,36 @@ def sphere_mesh(radius=1.0, quality=256, cache=True):
         Radius of the sphere
     quality: int
         Sphere mesh quality (higher = more triangles)
-    cache: bool
-        If true will attempt to load cached data and if not found will generate
-        and save the data for next time
-
     """
     # Generate cube face grid
-    fn = f"Sphere_{quality}_{radius:.4f}"
-    if cache and os.path.exists(fn + ".npz"):
-        sdata = np.load(fn + ".npz")
-    else:
-        lv = lavavu.Viewer()
-        tris0 = lv.spheres(
-            "sphere",
-            scaling=radius,
-            segments=quality,
-            colour="grey",
-            vertices=[0, 0, 0],
-            fliptexture=False,
-        )
-        tris0["rotate"] = [
-            0,
-            -90,
-            0,
-        ]  # This rotates the sphere coords to align with [0,360] longitude texture
-        tris0[
-            "texture"
-        ] = "data/blank.png"  # Need an initial texture or texcoords will not be generated
-        tris0["renderer"] = "sortedtriangles"
-        lv.render()
+    lv = lavavu.Viewer()
+    tris0 = lv.spheres(
+        "sphere",
+        scaling=radius,
+        segments=quality,
+        colour="grey",
+        vertices=[0, 0, 0],
+        fliptexture=False,
+    )
+    tris0["rotate"] = [
+        0,
+        -90,
+        0,
+    ]  # This rotates the sphere coords to align with [0,360] longitude texture
+    tris0[
+        "texture"
+    ] = "data/blank.png"  # Need an initial texture or texcoords will not be generated
+    tris0["renderer"] = "sortedtriangles"
+    lv.render()
 
-        # Generate and extract sphere vertices, texcoords etc
-        lv.bake()  # 1)
-        sdata = {}
-        element = tris0.data[0]
-        keys = element.available.keys()
-        for k in keys:
-            sdata[k] = tris0.data[k + "_copy"][0]
+    # Generate and extract sphere vertices, texcoords etc
+    lv.bake()  # 1)
+    sdata = {}
+    element = tris0.data[0]
+    keys = element.available.keys()
+    for k in keys:
+        sdata[k] = tris0.data[k + "_copy"][0]
 
-    # Save compressed vertex data
-    if cache:
-        np.savez_compressed(fn, **sdata)
     return sdata
 
 
@@ -513,7 +534,6 @@ def cubemap_sphere_vertices(
     vertical_exaggeration=1.0,
     topo_exaggeration=1,
     bathy_exaggeration=1,
-    cache=True,
     hemisphere=None,
 ):
     """
@@ -537,9 +557,6 @@ def cubemap_sphere_vertices(
         Multiplier to topography height only
     bathy_exaggeration: number
         Multiplier to bathymetry height only
-    cache: bool
-        If true will attempt to load cached data and if not found will generate
-        and save the data for next time
     hemisphere: str
         Crop the data to show a single hemisphere
         "N" = North polar
@@ -553,57 +570,41 @@ def cubemap_sphere_vertices(
         resolution = settings.GRIDRES
     # Generate cube face grid
     sdata = {}
-    cdata = {}
-    fn = f"{settings.DATA_PATH}/sphere/cube_sphere_{resolution}"
-    if cache and os.path.exists(fn + ".npz"):
-        cdata = np.load(fn + ".npz")
-        # Check for old data
-        if "F_texcoord" not in cdata:
-            cdata = {}  # Clear and re-write data
-        else:
-            cache = False  # Don't need to write again
-    os.makedirs(settings.DATA_PATH / "sphere", exist_ok=True)
 
     # For each cube face...
     minmax = []
     eminmax = []
     for f in ["F", "R", "B", "L", "U", "D"]:
-        if f in cdata:
-            verts = cdata[f]
-            tc = cdata[f + "_texcoord"]
-        else:
-            # For texcoords
-            tij = np.linspace(0.0, 1.0, resolution, dtype="float32")
-            tii, tjj = np.meshgrid(tij, tij)  # 2d grid
-            # For vertices
-            ij = np.linspace(-1.0, 1.0, resolution, dtype="float32")
-            ii, jj = np.meshgrid(ij, ij)  # 2d grid
-            zz = np.zeros(shape=ii.shape, dtype="float32")  # 3rd dim
-            if f == "F":  ##
-                vertices = np.dstack((ii, jj, zz + 1.0))
-                tc = np.dstack((tii, tjj))
-            elif f == "B":
-                vertices = np.dstack((ii, jj, zz - 1.0))
-                tc = np.dstack((1.0 - tii, tjj))
-            elif f == "R":
-                vertices = np.dstack((zz + 1.0, jj, ii))
-                tc = np.dstack((1.0 - tii, tjj))
-            elif f == "L":  ##
-                vertices = np.dstack((zz - 1.0, jj, ii))
-                tc = np.dstack((tii, tjj))
-            elif f == "U":
-                vertices = np.dstack((ii, zz + 1.0, jj))
-                tc = np.dstack((tii, 1.0 - tjj))
-            elif f == "D":  ##
-                vertices = np.dstack((ii, zz - 1.0, jj))
-                tc = np.dstack((tii, tjj))
-            # Normalise the vectors to form spherical patch  (normalised cube)
-            V = vertices.ravel().reshape((-1, 3))
-            norms = np.sqrt(np.einsum("...i,...i", V, V))
-            norms = norms.reshape(resolution, resolution, 1)
-            verts = vertices / norms
-            cdata[f] = verts.copy()
-            cdata[f + "_texcoord"] = tc
+        # For texcoords
+        tij = np.linspace(0.0, 1.0, resolution, dtype="float32")
+        tii, tjj = np.meshgrid(tij, tij)  # 2d grid
+        # For vertices
+        ij = np.linspace(-1.0, 1.0, resolution, dtype="float32")
+        ii, jj = np.meshgrid(ij, ij)  # 2d grid
+        zz = np.zeros(shape=ii.shape, dtype="float32")  # 3rd dim
+        if f == "F":  ##
+            vertices = np.dstack((ii, jj, zz + 1.0))
+            tc = np.dstack((tii, tjj))
+        elif f == "B":
+            vertices = np.dstack((ii, jj, zz - 1.0))
+            tc = np.dstack((1.0 - tii, tjj))
+        elif f == "R":
+            vertices = np.dstack((zz + 1.0, jj, ii))
+            tc = np.dstack((1.0 - tii, tjj))
+        elif f == "L":  ##
+            vertices = np.dstack((zz - 1.0, jj, ii))
+            tc = np.dstack((tii, tjj))
+        elif f == "U":
+            vertices = np.dstack((ii, zz + 1.0, jj))
+            tc = np.dstack((tii, 1.0 - tjj))
+        elif f == "D":  ##
+            vertices = np.dstack((ii, zz - 1.0, jj))
+            tc = np.dstack((tii, tjj))
+        # Normalise the vectors to form spherical patch  (normalised cube)
+        V = vertices.ravel().reshape((-1, 3))
+        norms = np.sqrt(np.einsum("...i,...i", V, V))
+        norms = norms.reshape(resolution, resolution, 1)
+        verts = vertices / norms
 
         # Scale and apply surface detail?
         if heightmaps:
@@ -646,6 +647,9 @@ def cubemap_sphere_vertices(
         sdata[f + "_texcoord"] = tc
 
     # Save height range
+    if len(minmax) == 0:
+        minmax = [0, vertical_exaggeration]
+        eminmax = [0, 1.0]
     minmax = np.array(minmax)
     eminmax = np.array(eminmax)
     sdata["range"] = (minmax.min(), minmax.max())
@@ -691,9 +695,6 @@ def cubemap_sphere_vertices(
             sdata[f] = sdata[f][half::, ::, ::]  # Crop bottom section
             sdata[f + "_texcoord"] = sdata[f + "_texcoord"][half::, ::, ::]
 
-    # Save compressed un-scaled vertex data
-    if cache:
-        np.savez_compressed(fn, **cdata)
     return sdata
 
 
@@ -825,7 +826,9 @@ def plot_region(
     Uses lat/lon as coordinate system, so no use for polar regions, scales heights to equivalent
     TODO: support using km as unit or other custom units instead with conversions from lat/lon
 
-    TODO: FINISH DOCUMENTING PARAMS
+    TODO: FIX LAT/LON ordering - we are using lon/lat in all interfaces from now on
+    TODO: cropbox: defaults to full earth if None passed, write a test for this
+    FINISH DOCUMENTING PARAMS
 
     Note: If you want to plot data in a region, but continue to display the entire earth, you may want to use plot_surface() instead.
 
@@ -884,11 +887,14 @@ def plot_region(
 
     D = [height.shape[1], height.shape[0]]
     sverts = np.zeros(shape=(height.shape[0], height.shape[1], 3))
-    lat0, lon0 = cropbox[0]
-    lat1, lon1 = cropbox[1]
+    lat0, lon0 = cropbox[0] if cropbox else [-90, 0]
+    lat1, lon1 = cropbox[1] if cropbox else [90, 360]
+    # TODO: Support crossing zero in longitude
+    # Will probably not support crossing poles
     xy = lv.grid2d(corners=((lon0, lat1), (lon1, lat0)), dims=D)
     sverts[::, ::, 0:2] = xy
     sverts[::, ::, 2] = height[::, ::]
+    assert len(sverts)
 
     # Default mask
     # mask_tex = f"{settings.DATA_PATH}/landmask/world.watermask.21600x10800.png"
@@ -914,8 +920,12 @@ def plot_region(
     )  # , fliptexture=False)
 
     img = Image.open(colour_tex)
-    cropped_img = crop_img_lat_lon(img, cropbox)
-    arr = np.array(cropped_img)
+    if cropbox:
+        cropped_img = crop_img_lat_lon(img, cropbox)
+        arr = np.array(cropped_img)
+    else:
+        arr = np.array(img)
+
     surf.texture(arr, flip=False)
     return lv
 
@@ -1137,7 +1147,29 @@ def plot_earth(
     return lv
 
 
-def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
+def lonlat_grid(longitudes, latitudes, resolution=None):
+    """
+    Creates a 2D geo grid from  corner coords and a sampling resolution
+    Returns the longitude then latitude arrays
+
+    Parameters
+    ----------
+    longitudes: ndarray or tuple
+        min/max longitudes as a tuple
+    latitudes: ndarray or tuple
+        min/max latitudes as a tuple
+    resolution: 2-tuple
+        Resolution of the 2d grid: (longitude-res, latitude-res)
+
+    Returns
+    -------
+    tuple (ndarray,ndarray): the grid as lon,lat
+    """
+
+
+def lonlat_grid_3D(
+    longitudes, latitudes, altitude=0.001, resolution=None, wrap_longitude=False
+):
     """
     Creates a grid of 3D vertices representing a regional 2D grid converted from lat,lon coords
     Used for plotting data arrays on a 3D earth plot
@@ -1149,17 +1181,25 @@ def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
         List of longitude values or min/max longitude as a tuple
     latitudes: ndarray or tuple
         List of latitude values or min/max latitude as a tuple
-    altitudes: float
+    altitudes: float / ndarray
         height above sea level in Mm
         Will fill this value in a fixed height grid
+        If an array is passed, will use this as the height map
     resolution: 2-tuple
         Resolution of the 2d grid, if provided will use corner points from
         longitudes,latitudes only and sample a regular grid between them of
         provided resolution
+    wrap_longitude: boolean
+        If the grid requires an extra coord to wraps the earth in longitude
+        coords then set this to True.
+        This will add a duplicate of the first longitude value as the last
+        value. Useful for cell centred grids allowing passing original coord
+        range, without this a manually calculated additional coord might not
+        interpolate correctly on the grid.
 
     Returns
     -------
-    ndarray: the 3D vertices of the 2D grid
+    ndarray: the 3D vertices of the grid
     """
 
     x = np.array(longitudes)
@@ -1169,7 +1209,12 @@ def lonlat_grid_3D(longitudes, latitudes, altitude=0.001, resolution=None):
         x = np.linspace(x[0], x[-1], resolution[0])
         y = np.linspace(y[0], y[-1], resolution[1])
 
-    lon, lat = np.meshgrid(x, y, indexing="ij")  # X,Y,Z
+    if wrap_longitude:
+        # Joining longitude coord to wrap when using cell centre grid
+        x[-1] = x[0]  # + 360
+        # x = np.append(x, x[0])
+
+    lon, lat = np.meshgrid(x, y, indexing="ij")
 
     arrays = lonlat_to_3D(lon, lat, altitude)
 
@@ -2077,7 +2122,7 @@ def process_landmask(texture, overwrite=False, redownload=False):
                 d0 = datetime.datetime.fromtimestamp(os.path.getmtime(testfile))
                 delta = datetime.datetime(2025, 5, 13) - d0
                 if delta.days > 0:
-                    print("Mask files out of date {delta.days} days, redownloading")
+                    print(f"Mask files out of date {delta.days} days, redownloading")
                     outdated = True
 
             # Calculate full image res to use for specified TEXRES
@@ -2247,6 +2292,26 @@ def process_gebco(cubemap, resolution, overwrite=False, redownload=False):
     else:
         heights = split_tex(height, settings.GRIDRES, flipud=True)
         np.savez_compressed(fn, **heights)
+
+
+class EarthTracers(tracers.Tracers):
+    """
+    Override the tracer class get_positions to use 3D coords
+    Allow us to track particles and pass in data in lon,lat,alt but do
+    the final plotting in 3D cartesian coords
+
+    EarthTracers(grid, count=1000, lowerbound=None, upperbound=None, limit=None, age=4, respawn_chance=0.2, speed_multiply=1.0, height=0.0, label='', viewer=lv)
+    """
+
+    def get_positions(self):
+        lon = self.positions[::, 0]
+        lat = self.positions[::, 1]
+        if self.dims > 2:
+            alt = self.positions[::, 2]
+            positions = lonlat_to_3D(lon=lon, lat=lat, alt=alt).T
+        else:
+            positions = lonlat_to_3D(lon=lon, lat=lat, alt=self.height).T
+        return positions
 
 
 def plot_vectors_xr(
@@ -2546,6 +2611,9 @@ def plot_surface(
 ):
     """
     Plots data on a region of the earth.
+
+    TODO: This should be regional version of earth_2d_plot, need to formalise naming for functions in regional/earth mode)
+    Currently it seems to do the same as earth_2d_plot?
 
     Parameters
     ----------
