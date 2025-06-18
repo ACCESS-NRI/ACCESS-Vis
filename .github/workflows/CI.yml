@@ -40,6 +40,10 @@ jobs:
 
       - name: Run tests
         shell: bash -l {0}
+        env:
+          LV_CONTEXT: moderngl
+          LV_ECHO_FAIL: 1
+          LV_ARGS: -v
         run: python -m pytest -s .
 
       - name: Upload code coverage

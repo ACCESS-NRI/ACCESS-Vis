@@ -16,7 +16,7 @@ dependencies:
   - xarray
   - pip
   - pip:
-    - lavavu
+    - lavavu-osmesa
     - moderngl
     - codecov
     - pytest-cov
