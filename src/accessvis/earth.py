@@ -830,7 +830,9 @@ def plot_region(
     TODO: cropbox: defaults to full earth if None passed, write a test for this
     FINISH DOCUMENTING PARAMS
 
-    Note: If you want to plot data in a region, but continue to display the entire earth, you may want to use plot_surface() instead.
+    Note:
+    If you want to plot data, you should use `plot_region_data()` after calling this function.
+    If you want to plot data in a region, but continue to display the entire 3D earth, you should use `earth_2d_plot()` instead.
 
     Parameters
     ----------
@@ -2606,14 +2608,11 @@ def plot_cross_section(
     return surf
 
 
-def plot_surface(
-    lv, data, start, end, alt=0.1, resolution=10, label="data-surface", **kwargs
-):
+def plot_region_data(lv, data, start, end, alt=0.1, label="data-surface", **kwargs):
     """
-    Plots data on a region of the earth.
-
-    TODO: This should be regional version of earth_2d_plot, need to formalise naming for functions in regional/earth mode)
-    Currently it seems to do the same as earth_2d_plot?
+    Plots data on a 2D region of the earth.
+    Use this to plot data after plot_region() is called.
+    Note: If you want to plot data in a region, but continue to display the entire earth, you may want to use earth_2d_plot() instead.
 
     Parameters
     ----------
@@ -2629,17 +2628,12 @@ def plot_surface(
         data[-1,-1] corrosponds to the end position.
     alt: number
         height above sea level to display the data.
-    resolution: int
-        The number of mesh points between start and end.
-        Increase if start/end cover a large range/if you see corners.
     label: str
         The name of the lavavu surface.
         Change this if plotting multiple surfaces.
     kwargs:
         Lavavu surface properties, e.g. lit=False.
         https://lavavu.github.io/Documentation/Property-Reference.html#object-surface
-
-    Note: For performance improvements, you may wish to use plot_region() instead of plot_earth(). Plot region uses fewer resources as it does not render the surface of the entire Earth.
 
     Returns
     -------
@@ -2650,16 +2644,14 @@ def plot_surface(
         label, colour="rgba(255,255,255,0)", **kwargs  # allows transparent data
     )
 
-    # Calculating the position of all vertices.
-    lats = np.linspace(start[1], end[1], resolution)
-    lons = np.linspace(start[0], end[0], resolution)
+    lons = np.linspace(start[0], end[0], 5)
+    lats = np.linspace(start[1], end[1], 5)
+    lons, lats = np.meshgrid(lons, lats)
+    alts = np.full_like(lons, alt)
 
-    vertices = np.array(
-        [latlon_to_3D(lat=lat, lon=lons, alt=alt) for lat in lats]
-    ).transpose((0, 2, 1))
-    vertices = vertices[::-1, :, :]
-
+    vertices = np.stack([lons, lats, alts], axis=-1)
     surf.vertices(vertices)
 
     surf.texture(data)
+
     return surf
