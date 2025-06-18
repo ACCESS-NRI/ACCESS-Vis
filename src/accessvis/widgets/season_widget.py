@@ -68,6 +68,8 @@ class SeasonWidget(WidgetMPL):
         ax.set_xticklabels(MONTH, size=20)
         ax.spines["polar"].set_color(self.text_colour)
 
+        ax.set_ylim([0, 10])
+
         # Colour background based on time of year:
         dec22_doy = datetime.date(2001, 12, 22).timetuple().tm_yday - 1
         dec22 = np.pi * 2.0 * dec22_doy / 365  # summer solstice
@@ -75,6 +77,8 @@ class SeasonWidget(WidgetMPL):
         theta = np.linspace(dec22, dec22 + 2 * np.pi, 500)
         R, T = np.meshgrid(r, theta)
         ax.pcolormesh(T, R, T, cmap=cmap, shading="gouraud")
+
+        self._update_mpl(fig=fig, ax=ax)
 
         return fig, ax
 
@@ -106,7 +110,7 @@ class SeasonWidget(WidgetMPL):
                 position,
                 0,
                 0,
-                8.5,
+                7.5,  # length of arrow
                 facecolor="#fff",
                 width=0.1,
                 head_length=2,
@@ -119,4 +123,7 @@ class SeasonWidget(WidgetMPL):
         """
         fig.suptitle("")
         if self.arrow is not None:
-            self.arrow.remove()
+            try:
+                self.arrow.remove()
+            except ValueError:
+                pass  # already removed
