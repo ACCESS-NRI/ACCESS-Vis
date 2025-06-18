@@ -15,7 +15,7 @@ import numpy as np
 import py360convert
 import quaternion as quat
 import xarray as xr
-from PIL import Image, ImageFile
+from PIL import Image
 
 from .utils import download, is_notebook, pushd
 
@@ -426,7 +426,7 @@ def crop_img_uv(img, cropbox):
 
         return arr
 
-    elif isinstance(img, ImageFile.ImageFile):
+    elif isinstance(img, Image.Image):
         crop_regions = []
         if u0 < 0:  # wraps around the left side
             crop_regions.append(
@@ -1419,7 +1419,7 @@ def vec_rotate(v, theta, axis):
     v : list/numpy.ndarray
         The 3 component vector
     theta : float
-        Angle in degrees
+        Angle in radians
     axis : list/numpy.ndarray
         The 3 component axis of rotation
 
@@ -2418,7 +2418,7 @@ def plot_vectors_xr(
             alt = max_alt
 
         # Basis vector directions, on the 3d model.
-        normal = latlon_normal_vector(lat, lon)
+        normal = latlon_normal_vector(lat=lat, lon=lon)
         east = latlon_vector_to_east(lat=lat, lon=lon)
         north = latlon_vector_to_north(lat=lat, lon=lon)
 

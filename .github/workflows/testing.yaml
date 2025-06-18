@@ -43,9 +43,10 @@ jobs:
           LV_CONTEXT: moderngl
           LV_ECHO_FAIL: 1
           LV_ARGS: -v
+          ACCESSVIS_DATA_DIR: /media/data/accessvis
         run: |
           python -m pip install moderngl freezegun
-          git clone -b tests --depth 1 https://github.com/ACCESS-NRI/ACCESS-Visualisation-Recipes.git
+          git clone --depth 1 https://github.com/ACCESS-NRI/ACCESS-Visualisation-Recipes.git
           cd ACCESS-Visualisation-Recipes/tests
           python tests.py thumbs
 

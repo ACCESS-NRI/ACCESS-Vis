@@ -194,7 +194,7 @@ class WidgetMPL(Widget):
 
         canvas = self.fig.canvas
         canvas.draw()
-        pixels = np.asarray(canvas.buffer_rgba())
+        pixels = np.asarray(canvas.buffer_rgba(), copy=True)
 
         self._reset_mpl(fig=self.fig, ax=self.ax, **kwargs)
 
@@ -218,4 +218,11 @@ def list_widgets():
     -------
     List[String]: The name of the classes.
     """
-    return [cls.__name__ for cls in Widget.__subclasses__()]
+
+    def get_subclasses(cls):
+        # From https://stackoverflow.com/questions/3862310/how-to-find-all-the-subclasses-of-a-class-given-its-name
+        for subclass in cls.__subclasses__():
+            yield from get_subclasses(subclass)
+            yield subclass.__name__
+
+    return [Widget.__name__] + list(get_subclasses(Widget))

@@ -54,6 +54,8 @@ class CalendarWidget(WidgetMPL):
         ax.set_xticklabels(MONTH, size=20)
         ax.spines["polar"].set_color(self.text_colour)
 
+        ax.set_ylim([0, 10])
+
         # Make Colours:
         ax.bar(x=0, height=10, width=np.pi * 2, color="black")
         for i in range(12):
@@ -90,7 +92,7 @@ class CalendarWidget(WidgetMPL):
                 position,
                 0,
                 0,
-                8.5,
+                7.5,
                 facecolor="#fff",
                 width=0.1,
                 head_length=2,
@@ -103,4 +105,7 @@ class CalendarWidget(WidgetMPL):
         """
         fig.suptitle("")
         if self.arrow is not None:
-            self.arrow.remove()
+            try:
+                self.arrow.remove()
+            except ValueError:
+                pass  # already removed
