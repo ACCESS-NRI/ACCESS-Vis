@@ -810,6 +810,21 @@ def load_topography(
     return heights  # * vertical_exaggeration
 
 
+def lonlat_minmax(a, b):
+    """
+    Takes two lon/lat tuples,
+    returns two tuples containing the smallest, largest of each lon/lat.
+    """
+
+    lon1, lat1 = a
+    lon2, lat2 = b
+    if lon1 > lon2:
+        lon1, lon2 = lon2, lon1
+    if lat1 > lat2:
+        lat1, lat2 = lat2, lat1
+    return (lon1, lat1), (lon2, lat2)
+
+
 def plot_region(
     lv=None,
     top_left=None,
@@ -855,6 +870,10 @@ def plot_region(
     vertical_exaggeration: number
         Multiplier to topography/bathymetry height
     """
+
+    if top_left and bottom_right:
+        top_left, bottom_right = lonlat_minmax(top_left, bottom_right)
+
     if lv is None:
         lv = lavavu.Viewer(
             border=False,
@@ -899,9 +918,10 @@ def plot_region(
     height = height * MtoLL * vertical_exaggeration
 
     D = [height.shape[1], height.shape[0]]
+
     sverts = np.zeros(shape=(height.shape[0], height.shape[1], 3))
-    lat0, lon0 = top_left if top_left else [-90, 0]
-    lat1, lon1 = bottom_right if bottom_right else [90, 360]
+    lon0, lat0 = top_left if top_left else [-90, 0]
+    lon1, lat1 = bottom_right if bottom_right else [90, 360]
     # TODO: Support crossing zero in longitude
     # Will probably not support crossing poles
     xy = lv.grid2d(corners=((lon0, lat1), (lon1, lat0)), dims=D)
