@@ -67,7 +67,7 @@ def test_normalise_array():
     assert np.allclose(arr3, exp3)
 
 
-def test_latlon_vector_to_north():
+def test_lonlat_vector_to_north():
     """
     At the equator, all point directly upwards.
     Should have length 1.
@@ -75,54 +75,54 @@ def test_latlon_vector_to_north():
     import accessvis
     import numpy as np
 
-    vec1 = accessvis.latlon_vector_to_north(lat=0.0, lon=0.0)
-    vec2 = accessvis.latlon_vector_to_north(lat=0, lon=90)
+    vec1 = accessvis.lonlat_vector_to_north(lat=0.0, lon=0.0)
+    vec2 = accessvis.lonlat_vector_to_north(lat=0, lon=90)
     vec3 = [0, 1, 0]
 
     assert np.allclose(vec1, vec2)
     assert np.allclose(vec1, vec3)
 
-    vec4 = accessvis.latlon_vector_to_north(lat=47.3, lon=88.1)
+    vec4 = accessvis.lonlat_vector_to_north(lat=47.3, lon=88.1)
     assert np.allclose(np.linalg.norm(vec4), 1), "doesn't have length 1."
 
 
-def test_latlon_vector_to_east():
+def test_lonlat_vector_to_east():
     import accessvis
     import numpy as np
 
-    vec1 = accessvis.latlon_vector_to_east(lat=0.0, lon=0.0)
+    vec1 = accessvis.lonlat_vector_to_east(lat=0.0, lon=0.0)
     vec2 = [1, 0, 0]
     assert np.allclose(vec1, vec2)
 
-    vec3 = accessvis.latlon_vector_to_east(lat=0, lon=-90)
+    vec3 = accessvis.lonlat_vector_to_east(lat=0, lon=-90)
     vec4 = [0, 0, 1]
     assert np.allclose(vec3, vec4)
 
-    norm_vec = accessvis.latlon_vector_to_east(lat=87.3, lon=-25.1)
+    norm_vec = accessvis.lonlat_vector_to_east(lat=87.3, lon=-25.1)
     assert np.allclose(np.linalg.norm(norm_vec), 1), "doesn't have length 1."
 
 
-def test_latlon_normal_vector():
+def test_lonlat_normal_vector():
     import accessvis
     import numpy as np
 
-    vec1 = accessvis.latlon_normal_vector(lat=0.0, lon=0.0)
+    vec1 = accessvis.lonlat_normal_vector(lat=0.0, lon=0.0)
     vec2 = [0, 0, 1]
     assert np.allclose(vec1, vec2)
 
-    vec3 = accessvis.latlon_normal_vector(lat=0, lon=90)
+    vec3 = accessvis.lonlat_normal_vector(lat=0, lon=90)
     vec4 = [1, 0, 0]
     assert np.allclose(vec3, vec4)
 
-    vec5 = accessvis.latlon_normal_vector(lat=90, lon=47.2)
+    vec5 = accessvis.lonlat_normal_vector(lat=90, lon=47.2)
     vec6 = [0, 1, 0]
     assert np.allclose(vec5, vec6)
 
-    vec7 = accessvis.latlon_normal_vector(lat=-90, lon=47.2)
+    vec7 = accessvis.lonlat_normal_vector(lat=-90, lon=47.2)
     vec8 = [0, -1, 0]
     assert np.allclose(vec7, vec8)
 
-    norm_vec = accessvis.latlon_normal_vector(lat=-65.1, lon=-48.1)
+    norm_vec = accessvis.lonlat_normal_vector(lat=-65.1, lon=-48.1)
     assert np.allclose(np.linalg.norm(norm_vec), 1), "doesn't have length 1."
 
 
@@ -252,25 +252,25 @@ def test_crop_img_lat_lon():
     arr[:, :10] = 1
     arr[:, 10:] = 2
 
-    cropbox1 = (90, -180), (-90, 0)  # left side
-    out1 = accessvis.crop_img_lat_lon(img=arr, cropbox=cropbox1)
+    tl1, br1 = (-180, 90), (0, -90)  # left side
+    out1 = accessvis.crop_img_lon_lat(img=arr, top_left=tl1, bottom_right=br1)
     assert out1.shape == (10, 10), f"Left shape {out1.shape}"
     assert np.all(out1 == 1), "Left sum"
 
-    cropbox2 = (45, -90), (-45, 90)  # Middle
-    out2 = accessvis.crop_img_lat_lon(img=arr, cropbox=cropbox2)
+    tl2, br2 = (-90, 45), (90, -45)  # Middle
+    out2 = accessvis.crop_img_lon_lat(img=arr, top_left=tl2, bottom_right=br2)
     assert out2.shape == (5, 10), f"Middle shape {out2.shape}"
     assert np.all(out2[:, :5] == 1), "middle 1"
     assert np.all(out2[:, 5:] == 2), "middle 2"
 
-    cropbox3 = (90, -270), (-90, -90)  # overflow left
-    out3 = accessvis.crop_img_lat_lon(img=arr, cropbox=cropbox3)
+    tl3, br3 = (-270, 90), (-90, -90)  # overflow left
+    out3 = accessvis.crop_img_lon_lat(img=arr, top_left=tl3, bottom_right=br3)
     assert out3.shape == (10, 10), "overflow left shape"
     assert np.all(out3[:, :5] == 2), "overflow left 1"
     assert np.all(out3[:, 5:] == 1), "overflow left 2"
 
-    cropbox4 = (90, 90), (-90, 270)  # overflow right
-    out4 = accessvis.crop_img_lat_lon(img=arr, cropbox=cropbox4)
+    tl4, br4 = (90, 90), (270, -90)  # overflow right
+    out4 = accessvis.crop_img_lon_lat(img=arr, top_left=tl4, bottom_right=br4)
     assert out4.shape == (10, 10), "overflow right shape"
     assert np.all(out4[:, :5] == 2), "overflow right 1"
     assert np.all(out4[:, 5:] == 1), "overflow right 2"
@@ -279,9 +279,9 @@ def test_crop_img_lat_lon():
 def test_latlon_to_uv():
     import accessvis
 
-    assert accessvis.latlon_to_uv(0, 0) == (0.5, 0.5)
-    assert accessvis.latlon_to_uv(90, -180) == (0, 0)
-    assert accessvis.latlon_to_uv(-90, 180) == (1, 1)
+    assert accessvis.lonlat_to_uv(lat=0, lon=0) == (0.5, 0.5)
+    assert accessvis.lonlat_to_uv(lat=90, lon=-180) == (0, 0)
+    assert accessvis.lonlat_to_uv(lat=-90, lon=180) == (1, 1)
 
 
 def test_uv_to_pixel():
@@ -295,7 +295,7 @@ def test_latlon_to_pixel():
 
     lon = 0.1 * 360 - 180
     lat = (1 - 0.8) * 180 - 90  # same as test_uv_to_pixel
-    assert accessvis.latlon_to_pixel(lon=lon, lat=lat, width=1017, height=8256) == (
+    assert accessvis.lonlat_to_pixel(lon=lon, lat=lat, width=1017, height=8256) == (
         101,
         6604,
     )
@@ -456,8 +456,6 @@ def test_lonlat_grid_3D():
         longitudes=np.array([0, 90, 180, 270]),
         altitude=0,
     )
-    print(out3.shape)
-    print(out3)
     R = 6.371
     exp3 = np.array(
         [
