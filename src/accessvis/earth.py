@@ -309,7 +309,7 @@ def split_tex(data, res, flipud=False, fliplr=False):
     return tiles
 
 
-def draw_latlon_grid(base_img, out_fn, lat=30, lon=30, linewidth=5, colour=0):
+def draw_lonlat_grid(base_img, out_fn, lon=30, lat=30, linewidth=5, colour=0):
     """
     Create lat/lon grid image over provided base image
     """
@@ -343,7 +343,7 @@ def draw_latlon_grid(base_img, out_fn, lat=30, lon=30, linewidth=5, colour=0):
     image.save(out_fn)
 
 
-def latlon_to_uv(lat, lon):
+def lonlat_to_uv(lon, lat):
     """
     Convert a decimal longitude, latitude coordinate
     to a tex coord in an equirectangular image
@@ -365,12 +365,12 @@ def uv_to_pixel(u, v, width, height):
     return int(u * width), int(v * height)
 
 
-def latlon_to_pixel(lat, lon, width, height):
+def lonlat_to_pixel(lon, lat, width, height):
     """
     Convert a decimal latitude/longitude coordinate
     to a raster image pixel coordinate for given width/height
     """
-    u, v = latlon_to_uv(lat, lon)
+    u, v = lonlat_to_uv(lon=lon, lat=lat)
     return uv_to_pixel(u, v, width, height)
 
 
@@ -472,13 +472,13 @@ def crop_img_uv(img, cropbox):
         print("Unknown type: ", type(img))
 
 
-def crop_img_lat_lon(img, cropbox):
+def crop_img_lon_lat(img, top_left, bottom_right):
     """
     Crop an equirectangular image (PIL or numpy array) based on corner coords
     Provide coords as lat/lon coords in decimal degrees
     """
-    a = latlon_to_uv(*cropbox[0])
-    b = latlon_to_uv(*cropbox[1])
+    a = lonlat_to_uv(*top_left)
+    b = lonlat_to_uv(*bottom_right)
     return crop_img_uv(img, (a, b))
 
 
@@ -754,7 +754,9 @@ def load_topography_cubemap(
     )
 
 
-def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True):
+def load_topography(
+    resolution=None, subsample=1, top_left=None, bottom_right=None, bathymetry=True
+):
     """
     Load topography from pre-saved equirectangular data, can be cropped for regional plots
 
@@ -775,8 +777,10 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
 
     if subsample > 1:
         heights = heights[::subsample, ::subsample]
-    if cropbox:
-        heights = crop_img_lat_lon(heights, cropbox)
+    if top_left and bottom_right:
+        heights = crop_img_lon_lat(
+            heights, top_left=top_left, bottom_right=bottom_right
+        )
 
     # Bathymetry?
     if not bathymetry or not isinstance(bathymetry, bool):
@@ -784,7 +788,11 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
         # res_y = resolution//4096 * 10800
         # res_y = max(resolution,2048) // 2048 * 10800
         mask = load_mask(
-            res_y=resolution, subsample=subsample, cropbox=cropbox, masktype="oceanmask"
+            res_y=resolution,
+            subsample=subsample,
+            top_left=top_left,
+            bottom_right=bottom_right,
+            masktype="oceanmask",
         )
         # print(type(mask), mask.dtype, mask.min(), mask.max())
         if bathymetry == "mask":
@@ -802,9 +810,25 @@ def load_topography(resolution=None, subsample=1, cropbox=None, bathymetry=True)
     return heights  # * vertical_exaggeration
 
 
+def lonlat_minmax(a, b):
+    """
+    Takes two lon/lat tuples,
+    returns two tuples containing the smallest, largest of each lon/lat.
+    """
+
+    lon1, lat1 = a
+    lon2, lat2 = b
+    if lon1 > lon2:
+        lon1, lon2 = lon2, lon1
+    if lat1 > lat2:
+        lat1, lat2 = lat2, lat1
+    return (lon1, lat1), (lon2, lat2)
+
+
 def plot_region(
     lv=None,
-    cropbox=None,
+    top_left=None,
+    bottom_right=None,
     vertical_exaggeration=10,
     texture="bluemarble",
     lighting=True,
@@ -846,6 +870,10 @@ def plot_region(
     vertical_exaggeration: number
         Multiplier to topography/bathymetry height
     """
+
+    if top_left and bottom_right:
+        top_left, bottom_right = lonlat_minmax(top_left, bottom_right)
+
     if lv is None:
         lv = lavavu.Viewer(
             border=False,
@@ -881,16 +909,19 @@ def plot_region(
             uniforms[k] = kwargs[k]
 
     # Load topo and crop via lat/lon boundaries of data
-    topo = load_topography(cropbox=cropbox, bathymetry=bathymetry)
+    topo = load_topography(
+        top_left=top_left, bottom_right=bottom_right, bathymetry=bathymetry
+    )
     height = np.array(topo)
 
     # Scale and apply vertical exaggeration
     height = height * MtoLL * vertical_exaggeration
 
     D = [height.shape[1], height.shape[0]]
+
     sverts = np.zeros(shape=(height.shape[0], height.shape[1], 3))
-    lat0, lon0 = cropbox[0] if cropbox else [-90, 0]
-    lat1, lon1 = cropbox[1] if cropbox else [90, 360]
+    lon0, lat0 = top_left if top_left else [-90, 0]
+    lon1, lat1 = bottom_right if bottom_right else [90, 360]
     # TODO: Support crossing zero in longitude
     # Will probably not support crossing poles
     xy = lv.grid2d(corners=((lon0, lat1), (lon1, lat0)), dims=D)
@@ -922,8 +953,10 @@ def plot_region(
     )  # , fliptexture=False)
 
     img = Image.open(colour_tex)
-    if cropbox:
-        cropped_img = crop_img_lat_lon(img, cropbox)
+    if top_left and bottom_right:
+        cropped_img = crop_img_lon_lat(
+            img, top_left=top_left, bottom_right=bottom_right
+        )
         arr = np.array(cropped_img)
     else:
         arr = np.array(img)
@@ -1455,31 +1488,31 @@ def normalise(vec):
     return vn
 
 
-def latlon_normal_vector(lat, lon):
+def lonlat_normal_vector(lon, lat):
     """
     If standing at (lat,lon), this unit vector points directly above.
     """
-    return normalise(latlon_to_3D(lat=lat, lon=lon))
+    return normalise(lonlat_to_3D(lat=lat, lon=lon))
 
 
-def latlon_vector_to_east(lat, lon):
+def lonlat_vector_to_east(lon, lat):
     """
     If standing at (lat,lon), this unit vector points east.
     """
-    start = latlon_to_3D(lat=lat, lon=lon)
-    north = latlon_to_3D(lat=90, lon=0)
+    start = lonlat_to_3D(lat=lat, lon=lon)
+    north = lonlat_to_3D(lat=90, lon=0)
     cross = np.cross(north, start)
     if np.any(cross):  # if start != north
         return normalise(cross)
     return np.array([1, 0, 0])
 
 
-def latlon_vector_to_north(lat, lon):
+def lonlat_vector_to_north(lon, lat):
     """
     If standing at (lat,lon), this unit vector points north.
     """
-    start = latlon_to_3D(lat=lat, lon=lon)
-    east = latlon_vector_to_east(lat=lat, lon=lon)
+    start = lonlat_to_3D(lat=lat, lon=lon)
+    east = lonlat_vector_to_east(lat=lat, lon=lon)
     return normalise(np.cross(start, east))
 
 
@@ -1802,7 +1835,9 @@ STEPS:
 bm_tiles = ["A1", "B1", "C1", "D1", "A2", "B2", "C2", "D2"]
 
 
-def load_mask(res_y=None, masktype="watermask", subsample=1, cropbox=None):
+def load_mask(
+    res_y=None, masktype="watermask", subsample=1, top_left=None, bottom_right=None
+):
     # TODO: Document args
     """
     Loads watermask/oceanmask
@@ -1833,8 +1868,8 @@ def load_mask(res_y=None, masktype="watermask", subsample=1, cropbox=None):
 
     if subsample > 1:
         mask = mask[::subsample, ::subsample]
-    if cropbox:
-        return crop_img_lat_lon(mask, cropbox)
+    if top_left and bottom_right:
+        return crop_img_lon_lat(mask, top_left=top_left, bottom_right=bottom_right)
     return mask
 
 
@@ -2420,17 +2455,20 @@ def plot_vectors_xr(
             alt = max_alt
 
         # Basis vector directions, on the 3d model.
-        normal = latlon_normal_vector(lat=lat, lon=lon)
-        east = latlon_vector_to_east(lat=lat, lon=lon)
-        north = latlon_vector_to_north(lat=lat, lon=lon)
+        normal = lonlat_normal_vector(lat=lat, lon=lon)
+        east = lonlat_vector_to_east(lat=lat, lon=lon)
+        north = lonlat_vector_to_north(lat=lat, lon=lon)
 
         if rescale_alt:
             # The bottom-most vector is ground level, top-most is at a height of alt_scale_factor above ground
             relative_height = (alt - min_alt) / (max_alt - min_alt)
-            vert = latlon_to_3D(lat, lon) + normal * relative_height * alt_scale_factor
+            vert = (
+                lonlat_to_3D(lat=lat, lon=lon)
+                + normal * relative_height * alt_scale_factor
+            )
             vertices.append(vert)
         else:
-            vert = latlon_to_3D(lat=lat, lon=lon, alt=alt * 1e-6)
+            vert = lonlat_to_3D(lat=lat, lon=lon, alt=alt * 1e-6)
             # 1e-6 is to convert from meters to Million meters (3d Scale)
             vertices.append(vert)
 
@@ -2524,7 +2562,7 @@ def plot_shapefile(lv, fn, features=None, alt=1e-6, label="shape_", **kwargs):
 
         # converting to 3d Coordinates.
         lons, lats = zip(*shape.points)
-        verts = latlon_to_3D(lat=lats, lon=lons, alt=alt).T
+        verts = lonlat_to_3D(lat=lats, lon=lons, alt=alt).T
 
         # Iterate through each part, e.g. each island.
         for i, (p1, p2) in enumerate(zip(shape.parts[:-1], shape.parts[1:])):
@@ -2597,8 +2635,8 @@ def plot_cross_section(
     # Calculating the position of all vertices.
     lats = np.linspace(start[1], end[1], resolution)
     lons = np.linspace(start[0], end[0], resolution)
-    lower = latlon_to_3D(lat=lats, lon=lons, alt=min_alt)
-    upper = latlon_to_3D(lat=lats, lon=lons, alt=max_alt)
+    lower = lonlat_to_3D(lat=lats, lon=lons, alt=min_alt)
+    upper = lonlat_to_3D(lat=lats, lon=lons, alt=max_alt)
     vertices = np.dstack((lower, upper)).T
 
     surf.vertices(vertices)
@@ -2608,7 +2646,7 @@ def plot_cross_section(
     return surf
 
 
-def plot_region_data(lv, data, start, end, alt=0.1, label="data-surface", **kwargs):
+def plot_region_data(lv, data, start, end, label="data-surface", **kwargs):
     """
     Plots data on a 2D region of the earth.
     Use this to plot data after plot_region() is called.
@@ -2621,11 +2659,12 @@ def plot_region_data(lv, data, start, end, alt=0.1, label="data-surface", **kwar
     data: np.ndarray
         An array of shape [width, height, RGB(A)].
     start: tuple[number, number]
-        (lon, lat)
-        data[0,0] corrosponds to the start position.
+        (lon, lat) or (lon, lat, alt)
+        data[0,0] corresponds to the start position.
+        alt is optional and defaults to 1e-5.
     end: tuple[number, number]
         (lon, lat)
-        data[-1,-1] corrosponds to the end position.
+        data[-1,-1] corresponds to the end position.
     alt: number
         height above sea level to display the data.
     label: str
@@ -2640,6 +2679,14 @@ def plot_region_data(lv, data, start, end, alt=0.1, label="data-surface", **kwar
     lavavu.Object
         The lavavu surface being created.
     """
+
+    if len(start) == 3:
+        alt = start[2]
+    elif len(end) == 3:
+        alt = end[2]
+    else:
+        alt = 1e-5
+
     surf = lv.triangles(
         label, colour="rgba(255,255,255,0)", **kwargs  # allows transparent data
     )
