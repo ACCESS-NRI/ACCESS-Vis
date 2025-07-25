@@ -90,7 +90,9 @@ def set_resolution(val):
 
     Parameters
     ----------
-    val: Texture and geometry resolution
+    val: int
+        Texture and geometry resolution
+        1=low ... 4=high
     """
     settings.RES = val
     settings.TEXRES = pow(2, 10 + val)
@@ -287,6 +289,17 @@ def split_tex(data, res, flipud=False, fliplr=False):
     """
     Convert a texture image from equirectangular to a set of 6 cubemap faces
     (requires py360convert)
+
+    Parameters
+    ----------
+    data: np.ndarray
+        data to split into cube faces.
+    res: int
+        Resolution of each face
+    flipud: bool|str
+        if up/down should be flipped (or which faces should be flipped)
+    fliplr: bool|str
+        if left/right should be flipped (or which faces should be flipped)
     """
     if isinstance(flipud, bool):
         # Can provide a list/string of faces to flip, or just a single bool to flip all
@@ -312,6 +325,21 @@ def split_tex(data, res, flipud=False, fliplr=False):
 def draw_lonlat_grid(base_img, out_fn, lon=30, lat=30, linewidth=5, colour=0):
     """
     Create lat/lon grid image over provided base image
+
+    Parameters
+    ----------
+    base_img:
+        Path to the input image
+    out_fn:
+        Path to the output image
+    lon: int
+        Distance between lines of longitude (degrees)
+    lat: int
+        Distance between lines of latitude (degrees)
+    linewidth: int
+        pixel width of the lines
+    colour:
+        Colour of the lines
     """
     from PIL import Image
 
@@ -476,6 +504,20 @@ def crop_img_lon_lat(img, top_left, bottom_right):
     """
     Crop an equirectangular image (PIL or numpy array) based on corner coords
     Provide coords as lat/lon coords in decimal degrees
+
+    Parameters
+    ----------
+    img: np.ndarray or PIL.ImageFile.ImageFile
+        The image to be cropped (numpy or PIL).
+    top_left: tuple
+        (lon, lat) Top left coordinates of the crop box.
+        If top_left or bottom_right are None, it returns the mask of the full earth.
+    bottom_right: tuple
+        (lon, lat) Bottom right coordinates of the crop box.
+        If top_left or bottom_right are None, it returns the mask of the full earth.
+    Returns:
+    ----------
+    np.ndarray or PIL.ImageFile.ImageFile
     """
     a = lonlat_to_uv(*top_left)
     b = lonlat_to_uv(*bottom_right)
@@ -760,7 +802,23 @@ def load_topography(
     """
     Load topography from pre-saved equirectangular data, can be cropped for regional plots
 
-    TODO: document args
+    Parameters
+    ----------
+    resolution:
+        Resolution of the topography in the Y direction.
+        defaults to settings.FULL_RES_Y (default 10800)
+        Note: res_x = 2 * res_y
+    subsample: int
+        Selects every Nth item from the mask.
+        e.g. subsample=2 takes every second lat and lon value.
+    top_left: tuple
+        (lon, lat) Top left coordinates of the crop box.
+        If top_left or bottom_right are None, it returns the mask of the full earth.
+    bottom_right: tuple
+        (lon, lat) Bottom right coordinates of the crop box.
+        If top_left or bottom_right are None, it returns the mask of the full earth.
+    bathymetry:
+        If the ocean floor should be shown.
     """
     if resolution is None:
         resolution = settings.FULL_RES_Y
@@ -812,8 +870,8 @@ def load_topography(
 
 def lonlat_minmax(a, b):
     """
-    Takes two lon/lat tuples,
-    returns two tuples containing the smallest, largest of each lon/lat.
+    Takes two lon/lat tuples (lon, lat).
+    Returns two tuples containing the smallest, largest of each lon/lat.
     """
 
     lon1, lat1 = a
@@ -840,7 +898,6 @@ def plot_region(
     uniforms={},
     shaders=None,
     background="black",
-    *args,
     **kwargs,
 ):
     """
@@ -850,16 +907,25 @@ def plot_region(
     Uses lat/lon as coordinate system, so no use for polar regions, scales heights to equivalent
     TODO: support using km as unit or other custom units instead with conversions from lat/lon
 
-    TODO: FIX LAT/LON ordering - we are using lon/lat in all interfaces from now on
-    TODO: cropbox: defaults to full earth if None passed, write a test for this
-    FINISH DOCUMENTING PARAMS
+    TODO: top_left/bottom_right: defaults to full earth if None passed, write a test for this
 
+    TODO: Implement lighting, waves, shaders arguments (currently unused)
+
+    TODO: Implement bathy_exaggeration and topo_exaggeration
     Note:
     If you want to plot data, you should use `plot_region_data()` after calling this function.
     If you want to plot data in a region, but continue to display the entire 3D earth, you should use `earth_2d_plot()` instead.
 
     Parameters
     ----------
+    lv: lavavu.Viewer
+        The viewer object to plot with
+    top_left: tuple
+        (lon, lat) Top left coordinates of the crop box.
+    bottom_right: tuple
+        (lon, lat) Bottom right coordinates of the crop box.
+    vertical_exaggeration: number
+        Multiplier to topography/bathymetry height
     texture: str
         Path to textures, face label and texres will be applied with .format(), eg:
         texture='path/{face}_mytexture_{texres}.png'
@@ -869,6 +935,23 @@ def plot_region(
         Append this label to each face object created
     vertical_exaggeration: number
         Multiplier to topography/bathymetry height
+    when: datetime
+        Provide a datetime object to set the month for texture sets that vary over the year and time for
+        position of sun and rotation of earth when calculating sun light position
+    blendtex: bool
+        When the texture set has varying seasonal images, enabling this will blend between the current month and next
+        months texture to smoothly transition between them as the date changes, defaults to True
+    bathymetry: bool
+        If the ocean floor should be shown
+    name: str
+        The name of the surface
+    uniforms: dict
+        Provide a set of uniform variables, these can be used to pass data to a custom shader
+    background: str
+        Provide a background colour string, X11 colour name or hex RGB
+    kwargs:
+        Additional lavavu arguments.
+        Covers global props, object props and uniform values
     """
 
     if top_left and bottom_right:
@@ -984,7 +1067,6 @@ def plot_earth(
     shaders=None,
     background="black",
     hemisphere=None,
-    *args,
     **kwargs,
 ):
     """
@@ -992,15 +1074,10 @@ def plot_earth(
     and sets up seasonal texture blending and optionally, sun position,
     based on given or current date and time
 
-    TODO: FINISH DOCUMENTING PARAMS
-
     Parameters
     ----------
-    texture: str
-        Path to textures, face label and texres will be applied with .format(), eg:
-        texture="path/{face}_mytexture_{texres}.png"
-        with: texture.format(face="F", texres=settings.TEXRES)
-        to:"path/F_mytexture_1024.png"
+    lv: lavavu.Viewer
+        The viewer object to plot with
     radius: float
         Radius of the sphere, defaults to 6.371 Earth's approx radius in Mm
     vertical_exaggeration: number
@@ -1010,6 +1087,11 @@ def plot_earth(
     bathy_exaggeration: number
         Multiplier to bathymetry height only
     texture: str
+        Path to textures, face label and texres will be applied with .format(), eg:
+        texture="path/{face}_mytexture_{texres}.png"
+        with: texture.format(face="F", texres=settings.TEXRES)
+        to:"path/F_mytexture_1024.png"
+
         Texture set to use, "bluemarble" for the 2004 NASA satellite data, "relief" for a basic relief map
         or provide a custom set of textures using a filename template with the following variables, only face is required
         {face} (F/R/B/L/U/D) {month} (name of month, capitialised) {texres} (2048/4096/8192/16384)
@@ -1046,6 +1128,9 @@ def plot_earth(
         "WE" = Prime meridian at centre (Africa/Europe)
         "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
         "W" = Western hemisphere - antimeridian to prime meridian (Americas)
+    kwargs:
+        Additional lavavu arguments.
+        Covers global props, object props and uniform values
     """
     if lv is None:
         lv = lavavu.Viewer(
@@ -1283,6 +1368,17 @@ def earth_2d_plot(
         Assumes the first coordinate of the array is longitude and second is latitude
         If order is reversed, need to transpose before passing, eg: data.transpose('latitude', 'longitude')
         If omitted, will skip texturing
+    colourmap: str or list or object
+        If a string, provides the name of a matplotlib colourmap to use
+        If a list is passed, should contain RGB[A] colours as lists or tuples in range [0,1] or [0,255],
+        a matplotlib.colors.LinearSegmentedColormap will be created from the list
+        Otherwise, will assume is a valid matplotlib colormap already
+    opacitymap: bool or numpy.ndarray
+        Set to true to use values as an opacity map, top of range will be opaque, bottom transparent
+        Provide an array to use a different opacity map dataset
+    opacitypower: float
+        Power to apply to values when calculating opacity map,
+        eg: 0.5 equivalent to opacity = sqrt(value), 2 equivalent to opacity = value*value
     longitudes: ndarray or tuple
         List of longitude values or min/max longitude as a tuple
     latitudes: ndarray or tuple
@@ -1293,7 +1389,8 @@ def earth_2d_plot(
     resolution: 2-tuple
         Resolution of the 2d grid, if provided will use corner points from
         data only and sample a regular grid between them of provided resolution
-
+    kwargs:
+        These kwargs are passed through to lv.surface().
     Returns
     -------
     lavavu.Object: the drawing object created
@@ -1345,7 +1442,25 @@ def earth_2d_plot(
 def update_earth_datetime(
     lv, when, name="", texture=None, sunlight=False, blendtex=True
 ):
-    # Update date/time for texture blending and lighting
+    """
+    Update date/time for texture blending and lighting
+
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The earth viewer object to plot with.
+    when: datetime.datetime
+        timestamp the earth should reflect.
+    name: str
+        the name of the surfaces the texture should be applied to.
+    texture:
+        "bluemarble" or path to the file containing the texture.
+    sunlight: bool
+        True means the light source should move to the correct position to reflect the given time.
+    blendtex: bool
+        If the bluemarble texture should be blended between months to approximate the given date.
+    """
+
     d = when.day - 1
     m = when.month
     month = when.strftime("%B")
@@ -1404,9 +1519,26 @@ def update_earth_datetime(
 
 
 def update_earth_texture(
-    lv, label, texture, flip=False, shared=True, name="", *args, **kwargs
+    lv, label, texture, flip=False, shared=True, name="", **kwargs
 ):
-    # Update texture values for a specific texture on earth model
+    """
+    Update texture values for a specific texture on earth model
+
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The earth viewer object to plot with.
+    label: str
+    flip: bool
+        Whether or not the textures should be flipped.
+    shared: bool
+        If the texture is shared between faces.
+    name:
+        The name of the object which the kwargs should be passed through to.
+    kwargs:
+        lavavu kwargs to pass through to the uniforms.
+    """
+
     if shared:
         # No need to update each object
         lv.texture(label, texture, flip)
@@ -1425,9 +1557,22 @@ def update_earth_texture(
     # lv.render()  # Required to render a frame which fixes texture glitch
 
 
-def update_earth_values(lv, name="", flip=False, *args, **kwargs):
-    # Update uniform values on earth objects via passed kwargs
+def update_earth_values(lv, name="", flip=False, **kwargs):
+    """
+    Update uniform values on earth objects via passed kwargs
 
+    Parameters
+    ----------
+    lv: lavavu.Viewer
+        The earth viewer object to plot with.
+    name: str
+        The name of the object which the kwargs should be passed through to.
+    flip: bool
+        Whether or not the textures should be flipped.
+    kwargs:
+        Lavavu arguments to pass through to the textures.
+
+    """
     # Replace texture data load shared texture afterwards
     for k in kwargs:
         if isinstance(kwargs[k], (np.ndarray, np.generic)) or k == "data":
@@ -1838,7 +1983,6 @@ bm_tiles = ["A1", "B1", "C1", "D1", "A2", "B2", "C2", "D2"]
 def load_mask(
     res_y=None, masktype="watermask", subsample=1, top_left=None, bottom_right=None
 ):
-    # TODO: Document args
     """
     Loads watermask/oceanmask
 
@@ -1852,7 +1996,24 @@ def load_mask(
     https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask_new/
     https://neo.gsfc.nasa.gov/archive/bluemarble/bmng/landmask/world.watermask.21600x21600.A1.png
 
-    masktype = "oceanmask" / "watermask"
+    Parameters
+    ----------
+    res_y:
+        defaults to settings.FULL_RES_Y (default 10800)
+        Resolution of the oceanmask png file.
+        res_x = 2 * res_y
+    masktype: str
+        "relief": lower quality
+        "oceanmask" or "watermask": better quality
+    subsample: int
+        Selects every Nth item from the mask.
+        e.g. subsample=2 takes every second lat and lon value.
+    top_left: tuple
+        (lon, lat) Top left coordinates of the crop box.
+        If top_left or bottom_right are None, it returns the mask of the full earth.
+    bottom_right: tuple
+        (lon, lat) Bottom right coordinates of the crop box.
+        If top_left or bottom_right are None, it returns the mask of the full earth.
     """
     if res_y is None:
         res_y = settings.FULL_RES_Y
@@ -1942,9 +2103,8 @@ def process_bluemarble(when=None, overwrite=False, redownload=False, blendtex=Tr
     """
     Download and process NASA Blue Marble next gen imagery
 
-    month: int
-        Month [1-12]
-        If omitted will gather and process all 12 month images
+    when: datetime.datetime
+        If None, it defaults to the current time.
     overwrite: bool
         Always re-process from source images overwriting any existing
     redownload: bool
@@ -2089,6 +2249,9 @@ def process_landmask(texture, overwrite=False, redownload=False):
     """
     Download and process ocean/water mask imagery
 
+    texture: str
+        "relief": lower quality but smaller.
+        Otherwise it uses both watermask and oceanmask to generate the mask
     overwrite: bool
         Always re-process from source images overwriting any existing
     redownload: bool
@@ -2250,11 +2413,11 @@ def process_landmask(texture, overwrite=False, redownload=False):
                         mimg.save(r_fn)
 
 
-def process_gebco(cubemap, resolution, overwrite=False, redownload=False):
+def process_gebco(cubemap, resolution, overwrite=False):
     """
     # Full res GEBCO .nc grid
 
-    This function generates cubemap sections at the desired resolution from the full res GEBCO dataset
+    This function generates cubemap sections at the desired resolution from the full res GEBCO dataset.
 
     https://www.bodc.ac.uk/data/hosted_data_systems/gebco_gridded_bathymetry_data/
 
@@ -2262,7 +2425,17 @@ def process_gebco(cubemap, resolution, overwrite=False, redownload=False):
     - See https://download.gebco.net/
     - NC version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2020/zip/
     - Sub-ice topo version: https://www.bodc.ac.uk/data/open_download/gebco/gebco_2023_sub_ice_topo/zip/
+
+    Parameters
+    ----------
+    cubemap: bool
+        Whether to download cubemap or equirectangular data.
+    resolution: int
+        Resolution of each cube face (e.g. 1024).
+    overwrite: bool
+        True means the files should be redownloaded.
     """
+
     if cubemap:
         fspec = f"{settings.DATA_PATH}/gebco/gebco_cubemap_{resolution}.npz"
         if not overwrite and len(glob.glob(fspec)) == 1:
