@@ -26,8 +26,8 @@ requirements:
     - xarray
     - tqdm
     - netcdf4
-    - lavavu-osmesa
-    - moderngl
+#    - pip: lavavu-osmesa
+#    - conda-forge::moderngl
 
 
 about:
