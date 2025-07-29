@@ -1,6 +1,7 @@
 name: CD
 
-on: [push, pull_request]
+on:
+  [push, pull_request, workflow_dispatch]
 
 jobs:
   pypi:
@@ -39,12 +40,11 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
 
       - name: Setup conda environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniconda-version: "latest"
           python-version: 3.11
           environment-file: .conda/environment.yml
           auto-update-conda: false
@@ -52,10 +52,9 @@ jobs:
           show-channel-urls: true
 
       - name: Build and upload the conda package
-        uses: uibcdf/action-build-and-upload-conda-packages@v1.4.0
+        uses: ACCESS_NRI/action-build-and-upload-conda-packages@v2.0.1
         with:
           meta_yaml_dir: .conda
-          python-version: 3.11
           user: accessnri
           label: main
-          token: ${{ secrets.anaconda_token }}
+          token: ${{ secrets.ANACONDA_TOKEN }}
