@@ -34,8 +34,9 @@ jobs:
 
   conda:
     name: build and deploy to conda
-    needs: pypi
-    if: always() && needs.pypi.result == 'success'
+    #needs: pypi
+    #if: always() && needs.pypi.result == 'success'
+    if: github.repository == 'ACCESS-NRI/ACCESS-Vis' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
     runs-on: "ubuntu-latest"
 
     steps:
