@@ -1,3 +1,4 @@
+{% set name = "accessvis" %}
 {% set version = load_setup_py_data(setup_file='../setup.py', from_recipe_dir=True).get('version') %}
 
 package:
@@ -26,8 +27,7 @@ requirements:
     - xarray
     - tqdm
     - netcdf4
-#    - pip: lavavu-osmesa
-#    - conda-forge::moderngl
+    - moderngl
 
 
 about:
