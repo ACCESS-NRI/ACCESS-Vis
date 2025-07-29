@@ -53,9 +53,9 @@ jobs:
           show-channel-urls: true
 
       - name: Build and upload the conda package
-        uses: ACCESS_NRI/action-build-and-upload-conda-packages@v2.0.1
+        uses: ACCESS-NRI/action-build-and-upload-conda-packages@v2.0.1
         with:
           meta_yaml_dir: .conda
-          user: accessnri
           label: main
+          user: ${{ secrets.ANACONDA_USER }}
           token: ${{ secrets.ANACONDA_TOKEN }}
