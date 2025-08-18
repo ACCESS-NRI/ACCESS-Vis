@@ -151,7 +151,7 @@ jobs:
 
           path = Path("${{ env.FILE_PATH }}")
           version = os.environ["VERSION"]
-          target = f"accessnri::access-vis=={version}"
+          target = f"accessnri::accessvis=={version}"
 
           yaml = YAML()
           yaml.preserve_quotes = True
@@ -168,7 +168,7 @@ jobs:
 
           replaced = False
           for i, d in enumerate(deps):
-            if isinstance(d, str) and d.startswith("accessnri::access-vis=="):
+            if isinstance(d, str) and d.startswith("accessnri::accessvis=="):
               if d != target:
                 deps[i] = target
               replaced = True
@@ -187,7 +187,7 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes to commit."
           else
-            git commit -m "analysis3: bump access-vis to ${VERSION}"
+            git commit -m "analysis3: bump accessvis to ${VERSION}"
             git push -u origin "$BRANCH"
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "$BRANCH" > ../branch.txt
@@ -203,6 +203,6 @@ jobs:
           gh pr create \
             --base "${TARGET_BRANCH}" \
             --head "${BRANCH}" \
-            --title "Bump access-vis to ${VERSION} in analysis3 env" \
-            --body "Updates \`${FILE_PATH}\` to \`accessnri::access-vis==${VERSION}\`."
+            --title "Bump accessvis to ${VERSION} in analysis3 env" \
+            --body "Updates \`${FILE_PATH}\` to \`accessnri::accessvis==${VERSION}\`."
           gh pr view "${BRANCH}" --json number -q .number > ../pr_number.txt
