@@ -40,7 +40,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
-          
+
   conda:
     name: build and deploy to conda
     needs: pypi
@@ -77,7 +77,7 @@ jobs:
       TARGET_REPO: ACCESS-Analysis-Conda
       TARGET_BRANCH: main
       FILE_PATH: environments/analysis3/environment.yml
-      PACKAGE: access-vis
+      PACKAGE: accessvis
       CHANNEL: accessnri
       RELEASE_TAG: ${{ github.ref_name }}
       INPUT_VERSION: ${{ github.event.inputs.version }}
