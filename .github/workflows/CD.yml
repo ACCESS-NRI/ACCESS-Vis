@@ -1,19 +1,26 @@
 name: CD
 
 on:
-  [push, pull_request, workflow_dispatch]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to (e.g. 2.3.0a9)'
+        required: false
+        type: string
 
 jobs:
   pypi:
     name: build and deploy to PyPI
-    if: github.repository == 'ACCESS-NRI/ACCESS-Vis' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
     runs-on: "ubuntu-latest"
     permissions:
       id-token: write
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -31,17 +38,16 @@ jobs:
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
+        with:
+          skip-existing: true
+          
   conda:
     name: build and deploy to conda
-    #needs: pypi
-    #if: always() && needs.pypi.result == 'success'
-    if: github.repository == 'ACCESS-NRI/ACCESS-Vis' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    needs: pypi
     runs-on: "ubuntu-latest"
-
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup conda environment
         uses: conda-incubator/setup-miniconda@v3
@@ -53,9 +59,150 @@ jobs:
           show-channel-urls: true
 
       - name: Build and upload the conda package
-        uses: ACCESS-NRI/action-build-and-upload-conda-packages@v2.0.1
+        uses: ACCESS-NRI/action-build-and-upload-conda-packages@v3.0.0
         with:
           meta_yaml_dir: .conda
-          label: main
-          user: ${{ secrets.ANACONDA_USER }}
+          upload: true
+          user: accessnri
           token: ${{ secrets.ANACONDA_TOKEN }}
+
+  update_analysis3:
+    name: Update ACCESS-VIS on Analysis3 Conda Environment
+    needs: conda
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ORG: ACCESS-NRI
+      TARGET_REPO: ACCESS-Analysis-Conda
+      TARGET_BRANCH: main
+      FILE_PATH: environments/analysis3/environment.yml
+      PACKAGE: access-vis
+      CHANNEL: accessnri
+      RELEASE_TAG: ${{ github.ref_name }}
+      INPUT_VERSION: ${{ github.event.inputs.version }}
+      GH_TOKEN: ${{ secrets.GH_ANALYSIS3_DEPLOY }}
+    steps:
+      - name: Derive version string
+        id: ver
+        run: |
+          if [ -n "${INPUT_VERSION}" ]; then
+            ver="${INPUT_VERSION}"
+          else
+            tag="${RELEASE_TAG}"
+            ver="${tag#v}"
+          fi
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+      - name: Install tooling (jq, gh, Python deps)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq python3-pip
+          if ! command -v gh >/dev/null; then
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+              sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |
+              sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+            sudo apt-get update -y && sudo apt-get install -y gh
+          fi
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ruamel.yaml
+
+      - name: Wait for conda package to appear in channel
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          echo "Waiting for ${CHANNEL}::${PACKAGE}==${VERSION} to appear…"
+          for i in $(seq 1 30); do
+            if curl -fsSL "https://api.anaconda.org/package/${CHANNEL}/${PACKAGE}" |
+               jq -e --arg v "$VERSION" '.files[] | select(.version == $v) | .version' >/dev/null; then
+              echo "Found ${PACKAGE} ${VERSION} in channel ${CHANNEL}."
+              exit 0
+            fi
+            echo "Not yet available. Retry $i/30…"
+            sleep 60
+          done
+          echo "Timed out waiting for ${CHANNEL}::${PACKAGE}==${VERSION}."
+          exit 1
+
+      - name: Clone Repo B
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${ORG}/${TARGET_REPO}.git"
+          cd "${TARGET_REPO}"
+          git config user.name "access-bot"
+          git config user.email "access-bot@users.noreply.github.com"
+
+      - name: Create branch and update environment.yml
+        id: edit
+        working-directory: ${{ env.TARGET_REPO }}
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          BRANCH="bump-${{ env.PACKAGE }}-${VERSION}"
+          git fetch origin "${TARGET_BRANCH}"
+          git checkout -b "$BRANCH" "origin/${TARGET_BRANCH}"
+
+          python3 - <<'PY'
+          from ruamel.yaml import YAML
+          from ruamel.yaml.comments import CommentedSeq
+          from pathlib import Path
+          import os, sys
+
+          path = Path("${{ env.FILE_PATH }}")
+          version = os.environ["VERSION"]
+          target = f"accessnri::access-vis=={version}"
+
+          yaml = YAML()
+          yaml.preserve_quotes = True
+          yaml.width = 4096
+          yaml.indent(mapping=2, sequence=2, offset=2)
+
+          text = path.read_text(encoding="utf-8")
+          data = yaml.load(text)
+
+          deps = data.get("dependencies", CommentedSeq())
+          if not isinstance(deps, list):
+            print("ERROR: dependencies is not a list", file=sys.stderr)
+            sys.exit(1)
+
+          replaced = False
+          for i, d in enumerate(deps):
+            if isinstance(d, str) and d.startswith("accessnri::access-vis=="):
+              if d != target:
+                deps[i] = target
+              replaced = True
+              break
+
+          if not replaced:
+            deps.append(target)
+
+          data["dependencies"] = deps
+          with open(path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f)
+          PY
+
+          git add "${FILE_PATH}"
+          if git diff --cached --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit."
+          else
+            git commit -m "analysis3: bump access-vis to ${VERSION}"
+            git push -u origin "$BRANCH"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "$BRANCH" > ../branch.txt
+          fi
+
+      - name: Create PR (idempotent)
+        if: steps.edit.outputs.changed == 'true'
+        working-directory: ${{ env.TARGET_REPO }}
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          BRANCH="$(cat ../branch.txt)"
+          gh pr create \
+            --base "${TARGET_BRANCH}" \
+            --head "${BRANCH}" \
+            --title "Bump access-vis to ${VERSION} in analysis3 env" \
+            --body "Updates \`${FILE_PATH}\` to \`accessnri::access-vis==${VERSION}\`."
+          gh pr view "${BRANCH}" --json number -q .number > ../pr_number.txt
