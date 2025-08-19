@@ -577,6 +577,7 @@ def cubemap_sphere_vertices(
     topo_exaggeration=1,
     bathy_exaggeration=1,
     hemisphere=None,
+    faces="FRBLUD",
 ):
     """
     Generate a spherical mesh from 6 cube faces, suitable for cubemap textures and
@@ -607,6 +608,8 @@ def cubemap_sphere_vertices(
         "WE" = Prime meridian at centre (Africa/Europe)
         "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
         "W" = Western hemisphere - antimeridian to prime meridian (Americas)
+    faces: str
+        list of faces to plot, default all 6 (FRLBUD == Front Right Left Back Up Down)
     """
     if resolution is None:
         resolution = settings.GRIDRES
@@ -616,7 +619,7 @@ def cubemap_sphere_vertices(
     # For each cube face...
     minmax = []
     eminmax = []
-    for f in ["F", "R", "B", "L", "U", "D"]:
+    for f in faces:
         # For texcoords
         tij = np.linspace(0.0, 1.0, resolution, dtype="float32")
         tii, tjj = np.meshgrid(tij, tij)  # 2d grid
@@ -668,10 +671,12 @@ def cubemap_sphere_vertices(
                 exag = np.zeros(shape=mask.shape, dtype=float)
                 exag += topo_exaggeration  # Set array to land exag
                 exag[mask == 0] = bathy_exaggeration  # Apply ocean exag with mask
+                # Filter anything above sea level within bathymetry mask (removes glitches around islands due to mask misalignment?)
+                hmap = heightmaps[f].reshape(outres)
+                hmap[mask == 0] = np.clip(hmap[mask == 0], a_min=None, a_max=0.0)
                 # Apply radius and heightmap
-                hmap = (heightmaps[f].reshape(outres) * exag).reshape(
-                    (resolution, resolution, 1)
-                )
+                hmap *= exag
+                hmap = hmap.reshape((resolution, resolution, 1))
                 verts *= hmap + radius
                 eminmax += [hmap.min(), hmap.max()]
             else:
@@ -699,6 +704,9 @@ def cubemap_sphere_vertices(
     sdata["exag_range"] = (eminmax.min(), eminmax.max())
 
     # Hemisphere crop?
+    if faces != "FRBLUD":
+        # If faces list provided, skip hemisphere cropping
+        return sdata
     half = resolution // 2
     if hemisphere == "N":  # U
         del sdata["D"]  # Delete south
@@ -748,6 +756,7 @@ def load_topography_cubemap(
     bathy_exaggeration=1,
     bathymetry=True,
     hemisphere=None,
+    faces="FRBLUD",
 ):
     """
     Load topography from pre-saved data
@@ -774,6 +783,8 @@ def load_topography_cubemap(
         "WE" = Prime meridian at centre (Africa/Europe)
         "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
         "W" = Western hemisphere - antimeridian to prime meridian (Americas)
+    faces: str
+        list of faces to plot, default all 6 (FRLBUD == Front Right Left Back Up Down)
     """
     # Load detailed topo data
     if resolution is None:
@@ -793,6 +804,7 @@ def load_topography_cubemap(
         topo_exaggeration,
         bathy_exaggeration,
         hemisphere=hemisphere,
+        faces=faces,
     )
 
 
@@ -1067,6 +1079,7 @@ def plot_earth(
     shaders=None,
     background="black",
     hemisphere=None,
+    faces="FRBLUD",
     **kwargs,
 ):
     """
@@ -1128,6 +1141,8 @@ def plot_earth(
         "WE" = Prime meridian at centre (Africa/Europe)
         "E" = Eastern hemisphere - prime meridian to antimeridian (Indian ocean)
         "W" = Western hemisphere - antimeridian to prime meridian (Americas)
+    faces: str
+        list of faces to plot, default all 6 (FRLBUD == Front Right Left Back Up Down)
     kwargs:
         Additional lavavu arguments.
         Covers global props, object props and uniform values
@@ -1148,6 +1163,7 @@ def plot_earth(
         topo_exaggeration,
         bathy_exaggeration,
         hemisphere=hemisphere,
+        faces=faces,
     )
     if when is None:
         when = datetime.datetime.now()
@@ -1206,7 +1222,7 @@ def plot_earth(
         else:
             uniforms[k] = kwargs[k]
 
-    for f in ["F", "R", "B", "L", "U", "D"]:
+    for f in faces:
         if f not in topo:
             continue  # For hemisphere crops
         verts = topo[f]
