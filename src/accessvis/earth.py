@@ -668,10 +668,12 @@ def cubemap_sphere_vertices(
                 exag = np.zeros(shape=mask.shape, dtype=float)
                 exag += topo_exaggeration  # Set array to land exag
                 exag[mask == 0] = bathy_exaggeration  # Apply ocean exag with mask
+                # Filter anything above sea level within bathymetry mask (removes glitches around islands due to mask misalignment?)
+                hmap = heightmaps[f].reshape(outres)
+                hmap[mask == 0] = np.clip(hmap[mask == 0], a_min=None, a_max=0.0)
                 # Apply radius and heightmap
-                hmap = (heightmaps[f].reshape(outres) * exag).reshape(
-                    (resolution, resolution, 1)
-                )
+                hmap *= exag
+                hmap = hmap.reshape((resolution, resolution, 1))
                 verts *= hmap + radius
                 eminmax += [hmap.min(), hmap.max()]
             else:
