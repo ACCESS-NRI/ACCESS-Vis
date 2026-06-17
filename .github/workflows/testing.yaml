@@ -7,6 +7,9 @@ on:
     branches:
       - '**'
 
+env:
+  PIP_UPLOADED_PRIOR_TO: P7D
+
 jobs:
   build:
     # Use vis server to run

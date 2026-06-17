@@ -2,6 +2,9 @@ name: CI
 
 on: [pull_request, push, workflow_dispatch]
 
+env:
+  PIP_UPLOADED_PRIOR_TO: P7D
+
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
